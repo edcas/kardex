@@ -24,6 +24,41 @@
                 selectedReceipts: [],
                 showPoliciesModal: false,
                 showAddVacationModal: false,
+                showInasistenciaModal: false,
+                showPermisoModal: false,
+                showIncapacidadModal: false,
+                newIncapacidad: {
+                    trabajadorSearch: '',
+                    trabajadorId: '',
+                    showTrabajadorDropdown: false,
+                    numeroIncapacidad: '',
+                    tipoIncapacidad: 'Enfermedad General',
+                    subtipoRiesgo: 'Accidente de Trabajo',
+                    fechaInicio: '',
+                    diasIncapacidad: '',
+                    fechaTermino: '',
+                    fechaExpedicion: '',
+                    modoIncapacidad: 'Inicial'
+                },
+                newPermiso: {
+                    tipo: 'Permiso',
+                    subTipo: 'Permiso sin goce de sueldo',
+                    fechaInicio: '',
+                    fechaTermino: '',
+                    inicioFechaAplicacion: '',
+                    activarSuplencia: false,
+                    colaboradorSuplente: '',
+                    comentario: ''
+                },
+                newInasistencia: {
+                    tipo: 'Inasistencia',
+                    fechaInicio: '',
+                    fechaTermino: '',
+                    inicioFechaAplicacion: '',
+                    activarSuplencia: false,
+                    colaboradorSuplente: '',
+                    comentario: ''
+                },
                 newVacation: {
                     startDate: '',
                     endDate: '',
@@ -103,6 +138,29 @@
                     const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
                     return daysDiff > 0 ? daysDiff : 0;
                 },
+                get inasistenciaDays() {
+                    if (!this.newInasistencia.fechaInicio || !this.newInasistencia.fechaTermino) return 0;
+                    const startDate = new Date(this.newInasistencia.fechaInicio);
+                    const endDate = new Date(this.newInasistencia.fechaTermino);
+                    const timeDiff = endDate.getTime() - startDate.getTime();
+                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+                    return daysDiff > 0 ? daysDiff : 0;
+                },
+                get permisoDays() {
+                    if (!this.newPermiso.fechaInicio || !this.newPermiso.fechaTermino) return 0;
+                    const startDate = new Date(this.newPermiso.fechaInicio);
+                    const endDate = new Date(this.newPermiso.fechaTermino);
+                    const timeDiff = endDate.getTime() - startDate.getTime();
+                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+                    return daysDiff > 0 ? daysDiff : 0;
+                },
+                get calculatedEndDate() {
+                    if (!this.newIncapacidad.fechaInicio || !this.newIncapacidad.diasIncapacidad) return '';
+                    const startDate = new Date(this.newIncapacidad.fechaInicio);
+                    const days = parseInt(this.newIncapacidad.diasIncapacidad) - 1; // -1 porque el primer día cuenta
+                    startDate.setDate(startDate.getDate() + days);
+                    return startDate.toISOString().split('T')[0];
+                },
                 get filteredTimelineEvents() {
                     if (!this.timelineEvents) return [];
                     return this.timelineEvents.filter(event => {
@@ -136,6 +194,15 @@
                         
                         return typeMatch && eventDate >= startDate && eventDate <= endDate;
                     });
+                },
+                get filteredTrabajadores() {
+                    if (!this.newIncapacidad.trabajadorSearch || this.newIncapacidad.trabajadorSearch.length < 2) return [];
+                    const searchTerm = this.newIncapacidad.trabajadorSearch.toLowerCase();
+                    return this.trabajadores.filter(trabajador => 
+                        trabajador.nombre.toLowerCase().includes(searchTerm) ||
+                        trabajador.puesto.toLowerCase().includes(searchTerm) ||
+                        trabajador.departamento.toLowerCase().includes(searchTerm)
+                    ).slice(0, 5); // Limitar a 5 resultados
                 },
 
                 // --- DATA ---
@@ -255,6 +322,18 @@
                     { id: 5, description: 'Actualizó domicilio de trabajador ID 15078', user: 'Eduardo Castillo', role: 'Administrador', date: '04/08/2025', time: '16:45:10', valueBefore: 'Calle Antigua 456', valueAfter: 'Calle Falsa 123', endpoint: '/api/users/1754/address', ip: '192.168.56.82' },
                     { id: 6, description: 'Generó reporte de auditoría', user: 'Eduardo Castillo', role: 'Administrador', date: '05/08/2025', time: '12:00:00', valueBefore: '-', valueAfter: '-', endpoint: '/api/reports/audit', ip: '192.168.56.82' },
                 ],
+                trabajadores: [
+                    { id: 1, nombre: 'ANTONIO SANCHEZ AQUIQUE', puesto: 'Analista de Nómina', departamento: 'Recursos Humanos' },
+                    { id: 2, nombre: 'Ana Eugenia Reyes Castellanos', puesto: 'Coordinadora', departamento: 'Finanzas' },
+                    { id: 3, nombre: 'Victoria Castro Rojas', puesto: 'Asistente', departamento: 'Administración' },
+                    { id: 4, nombre: 'Juan Pérez García', puesto: 'Desarrollador', departamento: 'Tecnología' },
+                    { id: 5, nombre: 'María García López', puesto: 'Contadora', departamento: 'Finanzas' },
+                    { id: 6, nombre: 'Carlos Rodríguez Martín', puesto: 'Gerente', departamento: 'Ventas' },
+                    { id: 7, nombre: 'Laura Méndez Torres', puesto: 'Analista', departamento: 'Recursos Humanos' },
+                    { id: 8, nombre: 'Pedro Morales Silva', puesto: 'Supervisor', departamento: 'Operaciones' },
+                    { id: 9, nombre: 'Ana Prueba X', puesto: 'Especialista', departamento: 'Marketing' },
+                    { id: 10, nombre: 'Roberto Jiménez Cruz', puesto: 'Técnico', departamento: 'Soporte' }
+                ],
                 
                 // --- METHODS ---
                 toggleAllReceipts(event) {
@@ -263,6 +342,11 @@
                     } else {
                         this.selectedReceipts = [];
                     }
+                },
+                selectTrabajador(trabajador) {
+                    this.newIncapacidad.trabajadorSearch = trabajador.nombre;
+                    this.newIncapacidad.trabajadorId = trabajador.id;
+                    this.newIncapacidad.showTrabajadorDropdown = false;
                 },
                 init() {
                     lucide.createIcons();
@@ -469,8 +553,8 @@
                                                         </div>
                                                     </div>
                                                     <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition flex items-center">
-                                                        <i data-lucide="external-link" class="w-4 h-4 mr-2"></i>
-                                                        Ir a Acuse de movimiento afiliatorio
+                                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                                        Descargar acuse de movimiento afiliatorio
                                                     </button>
                                                 </div>
                                             </div>
@@ -565,9 +649,27 @@
                              <div class="bg-white p-6 rounded-lg shadow-sm">
                                 <div class="flex justify-between items-center">
                                     <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="calendar-check" class="w-6 h-6 mr-3 text-blue-600"></i>Asistencia e Incapacidades</h2>
-                                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
-                                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Registrar Ausencia
-                                    </button>
+                                    <div class="relative" x-data="{ openAbsenceDropdown: false }">
+                                        <button @click="openAbsenceDropdown = !openAbsenceDropdown" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
+                                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                                            Registrar Ausencia
+                                            <i data-lucide="chevron-down" class="w-4 h-4 ml-2"></i>
+                                        </button>
+                                        <div x-show="openAbsenceDropdown" @click.outside="openAbsenceDropdown = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-10">
+                                            <a href="#" @click="openAbsenceDropdown = false; showInasistenciaModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
+                                                <i data-lucide="x-circle" class="w-4 h-4 mr-2 text-red-500"></i>
+                                                Inasistencia
+                                            </a>
+                                            <a href="#" @click="openAbsenceDropdown = false; showIncapacidadModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
+                                                <i data-lucide="heart-pulse" class="w-4 h-4 mr-2 text-orange-500"></i>
+                                                Incapacidad
+                                            </a>
+                                            <a href="#" @click="openAbsenceDropdown = false; showPermisoModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
+                                                <i data-lucide="clock" class="w-4 h-4 mr-2 text-blue-500"></i>
+                                                Permiso
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mt-8 overflow-x-auto">
                                     <table class="w-full text-sm">
@@ -908,6 +1010,301 @@
                                 </button>
                                 <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
                                     Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registrar Inasistencia Modal -->
+            <div x-show="showInasistenciaModal" @keydown.escape.window="showInasistenciaModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
+                <div @click.outside="showInasistenciaModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Registrar Inasistencia</h3>
+                        <button @click="showInasistenciaModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        <form @submit.prevent="console.log('Guardar inasistencia')">
+                            <!-- Tipo de Asistencia -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Asistencia <span class="text-red-500">*</span></label>
+                                <select x-model="newInasistencia.tipo" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                    <option value="Inasistencia">Inasistencia</option>
+                                </select>
+                            </div>
+
+                            <!-- Fechas -->
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Inicio <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newInasistencia.fechaInicio" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Término <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newInasistencia.fechaTermino" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                            </div>
+
+                            <!-- Inicio Fecha Aplicación -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Inicio Fecha Aplicación</label>
+                                <input type="date" x-model="newInasistencia.inicioFechaAplicacion" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                            </div>
+
+                            <!-- Activar Suplencia -->
+                            <div class="mb-4">
+                                <label class="flex items-center">
+                                    <input type="checkbox" x-model="newInasistencia.activarSuplencia" class="rounded border-slate-300 mr-2">
+                                    <span class="text-sm text-slate-700">Activar Suplencia</span>
+                                </label>
+                            </div>
+
+                            <!-- Colaborador Suplente -->
+                            <div x-show="newInasistencia.activarSuplencia" class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Colaborador Suplente</label>
+                                <select x-model="newInasistencia.colaboradorSuplente" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                    <option value="">Seleccionar colaborador...</option>
+                                    <option value="Ana Eugenia Reyes Castellanos (F1)">Ana Eugenia Reyes Castellanos (F1)</option>
+                                    <option value="Victoria Castro Rojas (F1)">Victoria Castro Rojas (F1)</option>
+                                    <option value="Juan Pérez (F2)">Juan Pérez (F2)</option>
+                                    <option value="María García (F3)">María García (F3)</option>
+                                </select>
+                            </div>
+
+                            <!-- Información de días calculados -->
+                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center" x-show="inasistenciaDays > 0">
+                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
+                                <span class="text-blue-800 text-sm">Estás registrando <strong x-text="inasistenciaDays"></strong> días de inasistencia</span>
+                            </div>
+
+                            <!-- Comentario -->
+                            <div class="mb-6">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Comentario</label>
+                                <textarea x-model="newInasistencia.comentario" rows="3" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="No se presentó explicó que tuvo una emergencia familiar."></textarea>
+                            </div>
+
+                            <!-- Botones -->
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" @click="showInasistenciaModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
+                                    Agregar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registrar Permiso Modal -->
+            <div x-show="showPermisoModal" @keydown.escape.window="showPermisoModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
+                <div @click.outside="showPermisoModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Registrar Permisos</h3>
+                        <button @click="showPermisoModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        <form @submit.prevent="console.log('Guardar permiso')">
+                            <!-- Tipo de Asistencia -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Asistencia <span class="text-red-500">*</span></label>
+                                <select x-model="newPermiso.tipo" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                    <option value="Permiso">Permiso</option>
+                                </select>
+                            </div>
+
+                            <!-- Subtipo de Permiso -->
+                            <div class="mb-4">
+                                <p class="text-sm text-blue-600 font-medium">Permiso sin goce de sueldo</p>
+                            </div>
+
+                            <!-- Fechas -->
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Inicio <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newPermiso.fechaInicio" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Término <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newPermiso.fechaTermino" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                            </div>
+
+                            <!-- Inicio Fecha Aplicación -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Inicio Fecha Aplicación</label>
+                                <input type="date" x-model="newPermiso.inicioFechaAplicacion" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                            </div>
+
+                            <!-- Activar Suplencia -->
+                            <div class="mb-4">
+                                <label class="flex items-center">
+                                    <input type="checkbox" x-model="newPermiso.activarSuplencia" class="rounded border-slate-300 mr-2">
+                                    <span class="text-sm text-slate-700">Activar Suplencia</span>
+                                </label>
+                            </div>
+
+                            <!-- Colaborador Suplente -->
+                            <div x-show="newPermiso.activarSuplencia" class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Colaborador Suplente</label>
+                                <select x-model="newPermiso.colaboradorSuplente" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                    <option value="">Seleccionar colaborador...</option>
+                                    <option value="Ana Prueba X (F1)">Ana Prueba X (F1)</option>
+                                    <option value="Victoria Castro Rojas (F1)">Victoria Castro Rojas (F1)</option>
+                                    <option value="Juan Pérez (F2)">Juan Pérez (F2)</option>
+                                    <option value="María García (F3)">María García (F3)</option>
+                                </select>
+                            </div>
+
+                            <!-- Información de días calculados -->
+                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center" x-show="permisoDays > 0">
+                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
+                                <span class="text-blue-800 text-sm">Estás registrando <strong x-text="permisoDays"></strong> días de permiso</span>
+                            </div>
+
+                            <!-- Comentario -->
+                            <div class="mb-6">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Comentario</label>
+                                <textarea x-model="newPermiso.comentario" rows="3" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="Permiso de ausencia por festival de su hijo"></textarea>
+                            </div>
+
+                            <!-- Botones -->
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" @click="showPermisoModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
+                                    Agregar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                        </div>
+
+            <!-- Registrar Incapacidad Modal -->
+            <div x-show="showIncapacidadModal" @keydown.escape.window="showIncapacidadModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
+                <div @click.outside="showIncapacidadModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-3xl">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Registrar Incapacidad</h3>
+                        <button @click="showIncapacidadModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        <form @submit.prevent="console.log('Guardar incapacidad')">
+                            <!-- Buscar Trabajador y Número de Incapacidad -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div class="relative">
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Buscar Trabajador <span class="text-red-500">*</span></label>
+                                    <input type="text" 
+                                           x-model="newIncapacidad.trabajadorSearch" 
+                                           @input="newIncapacidad.showTrabajadorDropdown = true"
+                                           @focus="newIncapacidad.showTrabajadorDropdown = true"
+                                           class="w-full rounded-md border-slate-300 shadow-sm text-sm" 
+                                           placeholder="Escribe para buscar..." 
+                                           autocomplete="off" 
+                                           required>
+                                    <input type="hidden" x-model="newIncapacidad.trabajadorId">
+                                    
+                                    <!-- Dropdown de resultados -->
+                                    <div x-show="newIncapacidad.showTrabajadorDropdown && filteredTrabajadores.length > 0" 
+                                         @click.outside="newIncapacidad.showTrabajadorDropdown = false"
+                                         class="absolute z-10 w-full bg-white border border-slate-300 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
+                                        <template x-for="trabajador in filteredTrabajadores" :key="trabajador.id">
+                                            <div @click="selectTrabajador(trabajador)" 
+                                                 class="px-4 py-3 hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0">
+                                                <div class="font-medium text-slate-800" x-text="trabajador.nombre"></div>
+                                                <div class="text-sm text-slate-500">
+                                                    <span x-text="trabajador.puesto"></span> • <span x-text="trabajador.departamento"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    
+                                    <!-- Mensaje cuando no hay resultados -->
+                                    <div x-show="newIncapacidad.showTrabajadorDropdown && newIncapacidad.trabajadorSearch.length >= 2 && filteredTrabajadores.length === 0"
+                                         class="absolute z-10 w-full bg-white border border-slate-300 rounded-md mt-1 shadow-lg">
+                                        <div class="px-4 py-3 text-slate-500 text-sm">
+                                            No se encontraron trabajadores
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Número de Incapacidad (Folio) <span class="text-red-500">*</span></label>
+                                    <input type="text" x-model="newIncapacidad.numeroIncapacidad" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="Ej: AB123456" pattern="[A-Za-z]{2}[0-9]{6}" required>
+                                    <p class="text-red-500 text-xs mt-1">Formato: 2 letras y 6 números</p>
+                                </div>
+                            </div>
+
+                            <!-- Tipo de Incapacidad y Subtipo -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Incapacidad IMSS <span class="text-red-500">*</span></label>
+                                    <select x-model="newIncapacidad.tipoIncapacidad" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                        <option value="Enfermedad General">Enfermedad General</option>
+                                        <option value="Maternidad">Maternidad</option>
+                                        <option value="Riesgo de Trabajo">Riesgo de Trabajo</option>
+                                    </select>
+                                </div>
+                                <div x-show="newIncapacidad.tipoIncapacidad === 'Riesgo de Trabajo'">
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Subtipo de Riesgo <span class="text-red-500">*</span></label>
+                                    <select x-model="newIncapacidad.subtipoRiesgo" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        <option value="Accidente de Trabajo">Accidente de Trabajo</option>
+                                        <option value="Accidente en Trayecto">Accidente en Trayecto</option>
+                                        <option value="Enfermedad de Trabajo">Enfermedad de Trabajo</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Fechas y Días -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de Inicio <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newIncapacidad.fechaInicio" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Días <span class="text-red-500">*</span></label>
+                                    <input type="number" x-model="newIncapacidad.diasIncapacidad" min="1" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de Término</label>
+                                    <input type="date" :value="calculatedEndDate" class="w-full rounded-md border-slate-300 shadow-sm text-sm bg-slate-100" readonly>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Expedición</label>
+                                    <input type="date" x-model="newIncapacidad.fechaExpedicion" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                </div>
+                            </div>
+
+                            <!-- Modo de Incapacidad -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Modo de Incapacidad <span class="text-red-500">*</span></label>
+                                <select x-model="newIncapacidad.modoIncapacidad" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                    <option value="Inicial">Inicial</option>
+                                    <option value="Subsecuente">Subsecuente</option>
+                                    <option value="Unica">Única</option>
+                                </select>
+                            </div>
+
+                            <!-- Advertencia de Nómina (condicional) -->
+                            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center" x-show="false">
+                                <i data-lucide="alert-triangle" class="w-5 h-5 text-yellow-600 mr-2"></i>
+                                <div>
+                                    <span class="font-medium text-yellow-800">¡Advertencia!</span>
+                                    <div class="text-yellow-700 text-sm mt-1">
+                                        El rango de fechas se cruza con un periodo de nómina ya autorizado.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botones -->
+                            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+                                <button type="button" @click="showIncapacidadModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
+                                    Guardar Incapacidad
                                 </button>
                             </div>
                         </form>
