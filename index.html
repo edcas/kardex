@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipo Kardex - BeePayroll</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@0.271.0/dist/umd/lucide.js"></script>
+
+    <!-- Alpine.js Initialization Script -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('kardexApp', () => ({
+                // --- STATE ---
+                activeTab: 'perfil',
+                showFullInfo: false,
+                expandedEventId: null,
+                selectedReceipts: [],
+                showPoliciesModal: false,
+                showAddVacationModal: false,
+                newVacation: {
+                    startDate: '',
+                    endDate: '',
+                    lastVacationPeriod: '15/06/2025 al 21/06/2025',
+                    hasReplacement: false,
+                    replacementEmployee: '',
+                    comments: ''
+                },
+                payrollFilters: {
+                    startDate: '',
+                    endDate: '',
+                    status: 'all'
+                },
+                auditLogPage: 1,
+                auditLogItemsPerPage: 5,
+                auditFilters: {
+                    startDate: '',
+                    endDate: '',
+                    description: ''
+                },
+
+                // --- COMPUTED ---
+                get filteredPayrollHistory() {
+                    if (!this.payrollHistory) return [];
+                    return this.payrollHistory.filter(receipt => {
+                        const statusMatch = this.payrollFilters.status === 'all' || receipt.status === this.payrollFilters.status;
+                        
+                        if (!this.payrollFilters.startDate || !this.payrollFilters.endDate) {
+                            return statusMatch;
+                        }
+
+                        const receiptDate = new Date(receipt.payDate.split('/').reverse().join('-'));
+                        const startDate = new Date(this.payrollFilters.startDate);
+                        const endDate = new Date(this.payrollFilters.endDate);
+                        
+                        return statusMatch && receiptDate >= startDate && receiptDate <= endDate;
+                    });
+                },
+                get filteredAuditLog() {
+                    if (!this.auditLog) return [];
+                    return this.auditLog.filter(log => {
+                        // Filtro por descripción
+                        const descriptionMatch = !this.auditFilters.description || 
+                            log.description.toLowerCase().includes(this.auditFilters.description.toLowerCase());
+                        
+                        // Si no hay fechas, solo aplicar filtro de descripción
+                        if (!this.auditFilters.startDate || !this.auditFilters.endDate) {
+                            return descriptionMatch;
+                        }
+
+                        // Filtro por fechas
+                        const logDate = new Date(log.date.split('/').reverse().join('-'));
+                        const startDate = new Date(this.auditFilters.startDate);
+                        const endDate = new Date(this.auditFilters.endDate);
+                        
+                        return descriptionMatch && logDate >= startDate && logDate <= endDate;
+                    });
+                },
+                get totalAuditPages() {
+                    return Math.ceil(this.filteredAuditLog.length / this.auditLogItemsPerPage);
+                },
+                get paginatedAuditLog() {
+                    const start = (this.auditLogPage - 1) * this.auditLogItemsPerPage;
+                    const end = start + this.auditLogItemsPerPage;
+                    return this.filteredAuditLog.slice(start, end);
+                },
+                get vacationDays() {
+                    if (!this.newVacation.startDate || !this.newVacation.endDate) return 0;
+                    const startDate = new Date(this.newVacation.startDate);
+                    const endDate = new Date(this.newVacation.endDate);
+                    const timeDiff = endDate.getTime() - startDate.getTime();
+                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+                    return daysDiff > 0 ? daysDiff : 0;
+                },
+
+                // --- DATA ---
+                employee: {
+                    name: 'ANTONIO SANCHEZ AQUIQUE',
+                    hireDate: '19/04/2024',
+                    address: 'Calle Falsa 123, Colonia Centro, Ciudad de México, CP 06000',
+                    phone: '55 1234 5678',
+                    email: 'antonio.sanchez@example.com',
+                    contractType: 'Contrato de trabajo por tiempo indeterminado',
+                    salary: '$551.25',
+                    bankAccount: '...6789',
+                    curp: 'SAAA741128HDFNQN04',
+                    rfc: 'SAAA741128CT4',
+                    nss: '39997418715',
+                    birthDate: '28/11/1974',
+                    gender: 'Masculino',
+                    maritalStatus: 'Soltero(a)',
+                    systemId: 'CDMX48690',
+                    seniorityDate: '19/04/2024',
+                    workdayType: 'Diurna',
+                    avatar: 'https://placehold.co/100x100/E0E7FF/4338CA?text=AS'
+                },
+                tabs: [
+                    { id: 'perfil', name: 'Perfil General' },
+                    { id: 'trayectoria', name: 'Trayectoria y Compensación' },
+                    { id: 'nomina', name: 'Historial de Pagos' },
+                    { id: 'asistencia', name: 'Asistencia e Incapacidades' },
+                    { id: 'vacaciones', name: 'Gestión de Vacaciones' },
+                    { id: 'documentos', name: 'Expediente Digital' },
+                    { id: 'auditoria', name: 'Auditoría' },
+                ],
+                timelineEvents: [
+                    {
+                        id: 4,
+                        date: '01 de Junio, 2025',
+                        title: 'Promoción a Analista Senior',
+                        summary: 'Promoción de Analista de Nómina a Analista Senior de Nómina.',
+                        icon: 'award',
+                        before: '<strong>Puesto:</strong> Analista de Nómina<br><strong>Salario Diario:</strong> $600.00',
+                        after: '<strong>Puesto:</strong> Analista Senior de Nómina<br><strong>Salario Diario:</strong> $750.00'
+                    },
+                    {
+                        id: 3,
+                        date: '19 de Abril, 2025',
+                        title: 'Primer Aniversario',
+                        summary: 'El trabajador cumplió su primer año en la compañía.',
+                        icon: 'cake',
+                        before: '<strong>Antigüedad:</strong> 0 años',
+                        after: '<strong>Antigüedad:</strong> 1 año'
+                    },
+                    {
+                        id: 1,
+                        date: '01 de Enero, 2025',
+                        title: 'Cambio Salarial',
+                        summary: 'Ajuste salarial por desempeño.',
+                        icon: 'trending-up',
+                        before: '<strong>Salario Diario:</strong> $551.25',
+                        after: '<strong>Salario Diario:</strong> $600.00'
+                    },
+                    {
+                        id: 2,
+                        date: '19 de Abril, 2024',
+                        title: 'Contratación Inicial',
+                        summary: 'Ingreso a la compañía como Analista de Nómina.',
+                        icon: 'briefcase',
+                        before: 'N/A',
+                        after: '<strong>Puesto:</strong> Analista de Nómina<br><strong>Salario Diario:</strong> $551.25'
+                    }
+                ],
+                payrollHistory: [
+                    { id: 1, period: '1ra Quincena Julio 2025', payDate: '15/07/2025', netAmount: '$8,580.50', status: 'Timbrado' },
+                    { id: 2, period: '2da Quincena Junio 2025', payDate: '30/06/2025', netAmount: '$8,550.00', status: 'Timbrado' },
+                    { id: 3, period: '1ra Quincena Junio 2025', payDate: '15/06/2025', netAmount: '$8,550.00', status: 'Timbrado' },
+                    { id: 4, period: '2da Quincena Mayo 2025', payDate: '31/05/2025', netAmount: '$0.00', status: 'Cancelado' },
+                    { id: 5, period: '1ra Quincena Mayo 2025', payDate: '15/05/2025', netAmount: '$8,550.00', status: 'Timbrado' },
+                ],
+                digitalFile: [
+                    { id: 1, name: 'Contrato de Trabajo.pdf' },
+                    { id: 2, name: 'Identificación Oficial (INE).pdf' },
+                    { id: 3, name: 'Constancia de Situación Fiscal.pdf' },
+                    { id: 4, name: 'Comprobante de Domicilio.pdf' },
+                    { id: 5, name: 'CURP.pdf' },
+                ],
+                attendanceHistory: [
+                    { id: 1, type: 'Día de cumpleaños', startDate: '13-08-2025', endDate: '13-08-2025', days: 1, status: 'Aprobado' },
+                    { id: 2, type: 'Inasistencia', startDate: '22-07-2025', endDate: '22-07-2025', days: 1, status: 'Aprobado' },
+                    { id: 3, type: 'Permiso con goce', startDate: '10-07-2025', endDate: '10-07-2025', days: 1, status: 'Aprobado' },
+                    { id: 4, type: 'Incapacidad', startDate: '09-07-2025', endDate: '09-07-2025', days: 1, status: 'Aprobado' },
+                ],
+                vacationPolicies: [
+                    { years: 1.0, days: 12, prima: 0.25, aguinaldo: 15},
+                    { years: 2.0, days: 14, prima: 0.25, aguinaldo: 15},
+                    { years: 3.0, days: 16, prima: 0.25, aguinaldo: 15},
+                    { years: 4.0, days: 18, prima: 0.25, aguinaldo: 15},
+                    { years: 5.0, days: 20, prima: 0.25, aguinaldo: 15},
+                    { years: '6.0 - 10.0', days: 22, prima: 0.25, aguinaldo: 15},
+                    { years: '11.0 - 15.0', days: 24, prima: 0.25, aguinaldo: 15},
+                ],
+                auditLog: [
+                    { id: 1, description: 'Creó nuevo trabajador con ID 15078', user: 'Eduardo Castillo', role: 'Administrador', date: '01/08/2025', time: '14:23:14', valueBefore: '-', valueAfter: 'ID: 15078', endpoint: '/api/users/new/1754', ip: '192.168.56.82' },
+                    { id: 2, description: 'Modificó salario de trabajador ID 15078', user: 'Laura Méndez', role: 'Nómina', date: '02/08/2025', time: '10:05:30', valueBefore: '$551.25', valueAfter: '$600.00', endpoint: '/api/users/1754/salary', ip: '192.168.56.88' },
+                    { id: 3, description: 'Descargó recibo de nómina Q15 Julio', user: 'ANTONIO SANCHEZ AQUIQUE', role: 'Empleado', date: '02/08/2025', time: '11:15:01', valueBefore: '-', valueAfter: '-', endpoint: '/api/paystubs/download/123', ip: '200.5.8.1' },
+                    { id: 4, description: 'Aprobó solicitud de vacaciones', user: 'Jefe Inmediato', role: 'Gerente', date: '03/08/2025', time: '09:30:00', valueBefore: 'Pendiente', valueAfter: 'Aprobada', endpoint: '/api/vacations/approve/45', ip: '192.168.56.91' },
+                    { id: 5, description: 'Actualizó domicilio de trabajador ID 15078', user: 'Eduardo Castillo', role: 'Administrador', date: '04/08/2025', time: '16:45:10', valueBefore: 'Calle Antigua 456', valueAfter: 'Calle Falsa 123', endpoint: '/api/users/1754/address', ip: '192.168.56.82' },
+                    { id: 6, description: 'Generó reporte de auditoría', user: 'Eduardo Castillo', role: 'Administrador', date: '05/08/2025', time: '12:00:00', valueBefore: '-', valueAfter: '-', endpoint: '/api/reports/audit', ip: '192.168.56.82' },
+                ],
+                
+                // --- METHODS ---
+                toggleAllReceipts(event) {
+                    if (event.target.checked) {
+                        this.selectedReceipts = this.filteredPayrollHistory.map(r => r.id);
+                    } else {
+                        this.selectedReceipts = [];
+                    }
+                },
+                init() {
+                    lucide.createIcons();
+                    this.$watch('activeTab', () => {
+                        this.$nextTick(() => lucide.createIcons());
+                    });
+                    this.$watch('filteredPayrollHistory', () => {
+                        this.$nextTick(() => lucide.createIcons());
+                    });
+                }
+            }));
+        });
+    </script>
+
+    <!-- Alpine.js Core -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        [x-cloak] { display: none !important; }
+        .tab-active {
+            border-bottom: 3px solid #2563EB;
+            color: #2563EB;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            border-bottom: 3px solid transparent;
+            color: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <div class="flex flex-col h-screen">
+        <!-- Top Header Bar -->
+        <header class="bg-white border-b border-slate-200 w-full flex-shrink-0">
+            <div class="flex items-center justify-between h-16 px-8">
+                <div class="flex items-center space-x-4">
+                    <button class="text-slate-500"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                    <span class="text-lg font-bold text-slate-800">Bee Payroll</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                        A
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <div class="flex flex-1 overflow-hidden" x-data="kardexApp" x-init="init()" x-cloak>
+            <!-- Main Sidebar (for context) -->
+            <aside class="w-64 bg-white shadow-md flex-shrink-0">
+                <nav class="p-4 space-y-2 mt-4">
+                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="layout-dashboard" class="w-5 h-5 mr-3"></i> Panel Principal</a>
+                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="building" class="w-5 h-5 mr-3"></i> Empresa</a>
+                    <a href="#" class="flex items-center p-2 bg-blue-100 text-blue-700 font-semibold rounded-md"><i data-lucide="users" class="w-5 h-5 mr-3"></i> Trabajadores</a>
+                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="file-text" class="w-5 h-5 mr-3"></i> Nóminas</a>
+                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="bar-chart-3" class="w-5 h-5 mr-3"></i> Reportes</a>
+                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="settings" class="w-5 h-5 mr-3"></i> Configuración</a>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 overflow-y-auto">
+                <div class="p-8">
+                    <!-- Header -->
+                    <div class="flex items-start space-x-6">
+                        <img :src="employee.avatar" alt="Foto de perfil" class="w-24 h-24 rounded-full border-4 border-white shadow-md">
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-2xl font-bold text-slate-800" x-text="`Detalles del trabajador ${employee.name}`"></h1>
+                                    <p class="text-sm text-slate-500" x-text="`Activo desde: ${employee.hireDate}`"></p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
+                                    <button class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i>Editar</button>
+                                    <button class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition flex items-center"><i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>Eliminar</button>
+                                </div>
+                            </div>
+                            <p class="text-sm text-slate-500 mt-2">Trabajadores > <span class="font-semibold text-slate-700" x-text="`Detalles del trabajador ${employee.name}`"></span></p>
+                        </div>
+                    </div>
+
+                    <!-- Alert Boxes -->
+                    <div class="mt-6 space-y-3">
+                        <div class="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-r-lg flex items-center">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 mr-3"></i>
+                            <p class="text-sm">El puesto de este trabajador no se encuentra en el listado de puestos por empresa</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab Navigation -->
+                    <nav class="mt-8 border-b border-slate-200">
+                        <div class="flex space-x-8">
+                            <template x-for="tab in tabs" :key="tab.id">
+                                <button @click="activeTab = tab.id" :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'" class="py-3 px-1 text-sm transition-colors duration-200" x-text="tab.name"></button>
+                            </template>
+                        </div>
+                    </nav>
+
+                    <!-- Tab Content -->
+                    <div class="mt-6">
+                        <!-- Pestaña: Perfil General -->
+                        <div x-show="activeTab === 'perfil'">
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="user-circle-2" class="w-6 h-6 mr-3 text-blue-600"></i>Resumen Principal</h2>
+                                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                                    <div><strong class="text-slate-500 block">Dirección Principal</strong> <span x-text="employee.address"></span></div>
+                                    <div><strong class="text-slate-500 block">Teléfono</strong> <span x-text="employee.phone"></span></div>
+                                    <div><strong class="text-slate-500 block">Correo Electrónico</strong> <span x-text="employee.email"></span></div>
+                                    <div><strong class="text-slate-500 block">Tipo de Contrato</strong> <span x-text="employee.contractType"></span></div>
+                                    <div><strong class="text-slate-500 block">Salario Diario</strong> <span x-text="employee.salary"></span></div>
+                                    <div><strong class="text-slate-500 block">Cuenta Bancaria</strong> **** <span x-text="employee.bankAccount.slice(-4)"></span></div>
+                                </div>
+                                <div class="mt-6">
+                                    <button @click="showFullInfo = !showFullInfo" class="text-blue-600 font-semibold text-sm flex items-center">
+                                        <span x-text="showFullInfo ? 'Ocultar Información Detallada' : 'Ver Información Detallada'"></span>
+                                        <i data-lucide="chevron-down" class="w-4 h-4 ml-1 transition-transform" :class="{'rotate-180': showFullInfo}"></i>
+                                    </button>
+                                </div>
+                                <div x-show="showFullInfo" x-collapse.duration.500ms>
+                                    <div class="mt-6 pt-6 border-t border-slate-200">
+                                        <h3 class="font-bold text-md text-slate-700 mb-4">Datos Personales y de Identificación</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                                            <div><strong class="text-slate-500 block">CURP</strong> <span x-text="employee.curp"></span></div>
+                                            <div><strong class="text-slate-500 block">RFC</strong> <span x-text="employee.rfc"></span></div>
+                                            <div><strong class="text-slate-500 block">NSS</strong> <span x-text="employee.nss"></span></div>
+                                            <div><strong class="text-slate-500 block">Fecha de Nacimiento</strong> <span x-text="employee.birthDate"></span></div>
+                                            <div><strong class="text-slate-500 block">Género</strong> <span x-text="employee.gender"></span></div>
+                                            <div><strong class="text-slate-500 block">Estado Civil</strong> <span x-text="employee.maritalStatus"></span></div>
+                                        </div>
+                                        <h3 class="font-bold text-md text-slate-700 mt-8 mb-4">Información Laboral y de Contrato</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                                            <div><strong class="text-slate-500 block">ID Empleado Sistema</strong> <span x-text="employee.systemId"></span></div>
+                                            <div><strong class="text-slate-500 block">Fecha de Antigüedad</strong> <span x-text="employee.seniorityDate"></span></div>
+                                            <div><strong class="text-slate-500 block">Tipo de Jornada</strong> <span x-text="employee.workdayType"></span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Trayectoria y Compensación -->
+                        <div x-show="activeTab === 'trayectoria'">
+                            <div class="relative pl-8 border-l-2 border-slate-200">
+                                <template x-for="(event, index) in timelineEvents" :key="event.id">
+                                    <div class="mb-10">
+                                        <div class="absolute -left-4 flex items-center justify-center w-8 h-8 bg-blue-600 rounded-full text-white">
+                                            <i :data-lucide="event.icon" class="w-5 h-5"></i>
+                                        </div>
+                                        <div class="bg-white p-5 rounded-lg shadow-sm ml-8">
+                                            <p class="text-xs text-slate-500" x-text="event.date"></p>
+                                            <h4 class="font-bold mt-1 text-slate-800" x-text="event.title"></h4>
+                                            <p class="text-sm text-slate-600 mt-1" x-text="event.summary"></p>
+                                            <button @click="expandedEventId = (expandedEventId === event.id ? null : event.id)" class="text-blue-600 text-sm font-semibold mt-3">
+                                                <span x-show="expandedEventId !== event.id">Ver Detalles...</span>
+                                                <span x-show="expandedEventId === event.id">Ocultar Detalles</span>
+                                            </button>
+                                            <div x-show="expandedEventId === event.id" x-collapse>
+                                                <div class="mt-4 pt-4 border-t border-slate-200 grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 class="font-semibold text-slate-400 mb-2 text-xs">ANTES</h5>
+                                                        <div class="space-y-1"><p x-html="event.before"></p></div>
+                                                    </div>
+                                                    <div>
+                                                        <h5 class="font-semibold text-slate-400 mb-2 text-xs">DESPUÉS</h5>
+                                                        <div class="space-y-1"><p x-html="event.after"></p></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Historial de Pagos -->
+                        <div x-show="activeTab === 'nomina'">
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                
+                                
+                                <!-- Filters and Actions -->
+                                <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                        <div>
+                                            <label for="startDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                            <input type="date" id="startDate" x-model="payrollFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="endDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                            <input type="date" id="endDate" x-model="payrollFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="statusFilter" class="text-xs font-semibold text-slate-600">Estado</label>
+                                            <select id="statusFilter" x-model="payrollFilters.status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                <option value="all">Todos</option>
+                                                <option value="Timbrado">Timbrados</option>
+                                                <option value="Cancelado">Cancelados</option>
+                                            </select>
+                                        </div>
+                                        <button 
+                                            :disabled="selectedReceipts.length === 0" 
+                                            class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center justify-center disabled:bg-slate-300 disabled:cursor-not-allowed">
+                                            <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                            <span x-text="`Descargar ${selectedReceipts.length} timbres`"></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="text-left text-slate-500 bg-slate-50">
+                                            <tr>
+                                                <th class="p-3 w-10 text-center"><input type="checkbox" @change="toggleAllReceipts($event)" class="rounded border-slate-300"></th>
+                                                <th class="p-3 font-semibold">Periodo</th>
+                                                <th class="p-3 font-semibold">Fecha de Pago</th>
+                                                <th class="p-3 font-semibold">Estado</th>
+                                                <th class="p-3 font-semibold text-right">Neto Pagado</th>
+                                                <th class="p-3 font-semibold text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="receipt in filteredPayrollHistory" :key="receipt.id">
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3 text-center"><input type="checkbox" :value="receipt.id" x-model="selectedReceipts" class="rounded border-slate-300"></td>
+                                                    <td class="p-3" x-text="receipt.period"></td>
+                                                    <td class="p-3" x-text="receipt.payDate"></td>
+                                                    <td class="p-3">
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded-full"
+                                                            :class="{
+                                                                'bg-green-100 text-green-800': receipt.status === 'Timbrado',
+                                                                'bg-red-100 text-red-800': receipt.status === 'Cancelado'
+                                                            }"
+                                                            x-text="receipt.status">
+                                                        </span>
+                                                    </td>
+                                                    <td class="p-3 text-right font-mono" x-text="receipt.netAmount"></td>
+                                                    <td class="p-3" x-data="{ open: false }">
+                                                        <div class="relative flex justify-center">
+                                                            <button @click="open = !open" class="p-2 text-slate-500 hover:text-blue-600"><i data-lucide="more-vertical" class="w-5 h-5"></i></button>
+                                                            <div x-show="open" @click.outside="open = false" x-transition class="absolute z-10 right-0 mt-10 w-48 bg-white rounded-md shadow-lg border border-slate-200">
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar PDF</a>
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar XML</a>
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar .ZIP</a>
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Ir a la nómina</a>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Asistencia e Incapacidades -->
+                        <div x-show="activeTab === 'asistencia'">
+                             <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="calendar-check" class="w-6 h-6 mr-3 text-blue-600"></i>Asistencia e Incapacidades</h2>
+                                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
+                                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Registrar Ausencia
+                                    </button>
+                                </div>
+                                <div class="mt-8 overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="text-left text-slate-500 bg-slate-50">
+                                            <tr>
+                                                <th class="p-3 font-semibold">Tipo</th>
+                                                <th class="p-3 font-semibold">Fecha inicio</th>
+                                                <th class="p-3 font-semibold">Fecha término</th>
+                                                <th class="p-3 font-semibold">Días</th>
+                                                <th class="p-3 font-semibold">Estado</th>
+                                                <th class="p-3 font-semibold text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="item in attendanceHistory" :key="item.id">
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3 font-semibold" x-text="item.type"></td>
+                                                    <td class="p-3" x-text="item.startDate"></td>
+                                                    <td class="p-3" x-text="item.endDate"></td>
+                                                    <td class="p-3" x-text="item.days"></td>
+                                                    <td class="p-3">
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800" x-text="item.status"></span>
+                                                    </td>
+                                                    <td class="p-3">
+                                                        <div class="flex justify-center space-x-2 text-slate-500">
+                                                            <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Gestión de Vacaciones -->
+                        <div x-show="activeTab === 'vacaciones'">
+                            <div class="space-y-6">
+                                <div class="bg-white p-6 rounded-lg shadow-sm">
+                                    <div class="flex justify-between items-center">
+                                        <h2 class="text-lg font-bold text-slate-800">Resumen de Vacaciones</h2>
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="showPoliciesModal = true" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Ver Prestaciones</button>
+                                            <button class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Modificar Prestaciones</button>
+                                        </div>
+                                    </div>
+                                    <!-- New Vacation Balance Layout -->
+                                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                                        <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                            <p class="text-sm text-blue-800 font-semibold">Total Saldo</p>
+                                            <p class="text-3xl font-bold text-blue-600 mt-1">11.0</p>
+                                            <p class="text-xs text-slate-500">Días disponibles</p>
+                                        </div>
+                                        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+                                            <p class="text-sm text-green-800 font-semibold">Acumuladas</p>
+                                            <p class="text-3xl font-bold text-green-600 mt-1">14.0</p>
+                                            <p class="text-xs text-slate-500">Días ganados por ley</p>
+                                        </div>
+                                        <div class="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                                            <p class="text-sm text-amber-800 font-semibold">Tomadas</p>
+                                            <p class="text-3xl font-bold text-amber-600 mt-1">1.0</p>
+                                            <p class="text-xs text-slate-500">Días ya disfrutados</p>
+                                        </div>
+                                        <div class="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                            <p class="text-sm text-red-800 font-semibold">Vencidas</p>
+                                            <p class="text-3xl font-bold text-red-600 mt-1">2.0</p>
+                                            <p class="text-xs text-slate-500">Periodos expirados</p>
+                                        </div>
+                                        <div class="bg-slate-50 border border-slate-200 p-4 rounded-lg">
+                                            <p class="text-sm text-slate-600 font-semibold">Tomadas en Futuro</p>
+                                            <p class="text-3xl font-bold text-slate-500 mt-1">0.0</p>
+                                            <p class="text-xs text-slate-500">Solicitudes aprobadas</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Vacaciones Tomadas -->
+                                <div class="bg-white p-6 rounded-lg shadow-sm">
+                                    <div class="flex justify-between items-center">
+                                        <h2 class="text-lg font-bold text-slate-800">Historial de Vacaciones Tomadas</h2>
+                                        <button @click="showAddVacationModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
+                                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Agregar
+                                        </button>
+                                    </div>
+                                    <div class="mt-4 overflow-x-auto">
+                                        <table class="w-full text-sm">
+                                            <thead class="text-left text-slate-500 bg-slate-50">
+                                                <tr>
+                                                    <th class="p-3 font-semibold">Inicio</th>
+                                                    <th class="p-3 font-semibold">Término</th>
+                                                    <th class="p-3 font-semibold">Número de Días</th>
+                                                    <th class="p-3 font-semibold">Tipo</th>
+                                                    <th class="p-3 font-semibold">Estado</th>
+                                                    <th class="p-3 font-semibold">Opciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3">11-09-2025</td>
+                                                    <td class="p-3">11-09-2025</td>
+                                                    <td class="p-3">1.0</td>
+                                                    <td class="p-3">Legales</td>
+                                                    <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Aprobada</span></td>
+                                                    <td class="p-3">
+                                                        <div class="flex space-x-2 text-slate-500">
+                                                            <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                         <!-- Pestaña: Expediente Digital -->
+                        <div x-show="activeTab === 'documentos'">
+                             <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="folder-archive" class="w-6 h-6 mr-3 text-blue-600"></i>Expediente Digital</h2>
+                                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
+                                        <i data-lucide="upload" class="w-4 h-4 mr-2"></i>Subir archivo
+                                    </button>
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <template x-for="doc in digitalFile">
+                                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <i data-lucide="file-text" class="w-5 h-5 mr-3 text-slate-500"></i>
+                                                <span class="text-sm font-semibold" x-text="doc.name"></span>
+                                            </div>
+                                            <button class="p-1 text-slate-400 hover:text-blue-600"><i data-lucide="download" class="w-5 h-5"></i></button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Auditoría -->
+                        <div x-show="activeTab === 'auditoria'">
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="shield-check" class="w-6 h-6 mr-3 text-blue-600"></i>Registro de Auditoría</h2>
+                                
+                                <!-- Filtros -->
+                                <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="auditStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                            <input type="date" id="auditStartDate" x-model="auditFilters.startDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="auditEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                            <input type="date" id="auditEndDate" x-model="auditFilters.endDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="auditDescription" class="text-xs font-semibold text-slate-600">Búsqueda por descripción</label>
+                                            <input type="text" id="auditDescription" x-model="auditFilters.description" @input="auditLogPage = 1" placeholder="Buscar en descripción..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="text-left text-slate-500 bg-slate-50">
+                                            <tr>
+                                                <th class="p-3 font-semibold">Descripción</th>
+                                                <th class="p-3 font-semibold">Nombre usuario</th>
+                                                <th class="p-3 font-semibold">Rol de usuario</th>
+                                                <th class="p-3 font-semibold">Fecha</th>
+                                                <th class="p-3 font-semibold">Hora</th>
+                                                <th class="p-3 font-semibold">Valor Antes</th>
+                                                <th class="p-3 font-semibold">Valor Después</th>
+                                                <th class="p-3 font-semibold">Endpoint</th>
+                                                <th class="p-3 font-semibold">Ip de ejecución</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="log in paginatedAuditLog" :key="log.id">
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3" x-text="log.description"></td>
+                                                    <td class="p-3" x-text="log.user"></td>
+                                                    <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700" x-text="log.role"></span></td>
+                                                    <td class="p-3" x-text="log.date"></td>
+                                                    <td class="p-3" x-text="log.time"></td>
+                                                    <td class="p-3 text-xs" x-text="log.valueBefore || '-'"></td>
+                                                    <td class="p-3 text-xs" x-text="log.valueAfter || '-'"></td>
+                                                    <td class="p-3 font-mono text-xs" x-text="log.endpoint"></td>
+                                                    <td class="p-3 font-mono text-xs" x-text="log.ip"></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Pagination -->
+                                <div class="mt-4 flex justify-between items-center text-sm">
+                                    <p class="text-slate-500" x-text="`Mostrando ${paginatedAuditLog.length} de ${filteredAuditLog.length} registros`"></p>
+                                    <div class="flex items-center space-x-1">
+                                        <button @click="auditLogPage = Math.max(1, auditLogPage - 1)" :disabled="auditLogPage === 1" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                                        <template x-for="page in totalAuditPages">
+                                            <button @click="auditLogPage = page" :class="{'bg-blue-600 text-white': auditLogPage === page, 'hover:bg-slate-100': auditLogPage !== page}" class="px-3 py-1 rounded-md" x-text="page"></button>
+                                        </template>
+                                        <button @click="auditLogPage = Math.min(totalAuditPages, auditLogPage + 1)" :disabled="auditLogPage === totalAuditPages" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </main>
+
+            <!-- Policies Modal -->
+            <div x-show="showPoliciesModal" @keydown.escape.window="showPoliciesModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
+                <div @click.outside="showPoliciesModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-3xl">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Políticas de Vacaciones del Colaborador</h3>
+                        <button @click="showPoliciesModal = false" class="text-slate-500 hover:text-slate-800">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="text-sm font-semibold text-slate-600">Periodo</label>
+                                <input type="text" value="1° Quincena, Julio '25" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" disabled>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold text-slate-600">Ver Tipo de Vacaciones</label>
+                                <select class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                    <option>Legales</option>
+                                </select>
+                            </div>
+                        </div>
+                        <h4 class="font-bold text-slate-700 mb-2">Legal 2023</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-left text-slate-500 bg-slate-50">
+                                    <tr>
+                                        <th class="p-3 font-semibold">Años de antigüedad</th>
+                                        <th class="p-3 font-semibold">Días de vacaciones</th>
+                                        <th class="p-3 font-semibold">Prima Vacacional</th>
+                                        <th class="p-3 font-semibold">Días de Aguinaldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="policy in vacationPolicies">
+                                        <tr class="border-t border-slate-200">
+                                            <td class="p-3" x-text="policy.years"></td>
+                                            <td class="p-3" x-text="policy.days"></td>
+                                            <td class="p-3" x-text="policy.prima"></td>
+                                            <td class="p-3" x-text="policy.aguinaldo"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Vacation Modal -->
+            <div x-show="showAddVacationModal" @keydown.escape.window="showAddVacationModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
+                <div @click.outside="showAddVacationModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Tomar Vacaciones</h3>
+                        <button @click="showAddVacationModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        <!-- Días disponibles -->
+                        <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center">
+                            <i data-lucide="palm-tree" class="w-5 h-5 text-green-600 mr-2"></i>
+                            <span class="text-green-800 font-semibold">11.0 días totales disponibles</span>
+                        </div>
+
+                        <form @submit.prevent="console.log('Guardar vacación')">
+                            <!-- Información de días disponibles -->
+                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
+                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
+                                <span class="text-blue-800 text-sm">Tienes <strong>11.0 días</strong> disponibles.</span>
+                            </div>
+
+                            <!-- Fechas -->
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de inicio <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newVacation.startDate" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de término <span class="text-red-500">*</span></label>
+                                    <input type="date" x-model="newVacation.endDate" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
+                                </div>
+                            </div>
+
+                            <!-- Periodo de última vacación -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Periodo de la última vacación <span class="text-red-500">*</span></label>
+                                <input type="text" x-model="newVacation.lastVacationPeriod" class="w-full rounded-md border-slate-300 shadow-sm text-sm" value="15/06/2025 al 21/06/2025" required readonly>
+                            </div>
+
+                            <!-- Checkboxes -->
+                            <div class="mb-4 space-y-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" x-model="newVacation.hasReplacement" class="rounded border-slate-300 mr-2">
+                                    <span class="text-sm text-slate-700">Asignar reemplazo o suplencia</span>
+                                </label>
+                            </div>
+
+                            <!-- Colaborador suplente -->
+                            <div x-show="newVacation.hasReplacement" class="mb-4">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Colaborador Suplente</label>
+                                <select x-model="newVacation.replacementEmployee" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                    <option value="">Seleccionar colaborador...</option>
+                                    <option value="Victoria Castro Rojas (F1)">Victoria Castro Rojas (F1)</option>
+                                    <option value="Juan Pérez (F2)">Juan Pérez (F2)</option>
+                                    <option value="María García (F3)">María García (F3)</option>
+                                </select>
+                            </div>
+
+                            <!-- Información de días solicitados -->
+                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center" x-show="vacationDays > 0">
+                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
+                                <span class="text-blue-800 text-sm">Estás solicitando <strong x-text="vacationDays"></strong> días laborales de vacaciones</span>
+                            </div>
+
+                            <!-- Comentario -->
+                            <div class="mb-6">
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Comentario</label>
+                                <textarea x-model="newVacation.comments" rows="3" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="Agregar comentarios adicionales..."></textarea>
+                            </div>
+
+                            <!-- Botones -->
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" @click="showAddVacationModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
+                                    Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
