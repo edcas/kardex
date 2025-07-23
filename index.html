@@ -11,8 +11,10 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.271.0/dist/umd/lucide.js"></script>
 
-    <!-- Alpine.js Initialization Script -->
-    <script>
+    <!-- Alpine.js Core -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <script defer>
         document.addEventListener('alpine:init', () => {
             Alpine.data('kardexApp', () => ({
                 // --- STATE ---
@@ -41,6 +43,11 @@
                     startDate: '',
                     endDate: '',
                     description: ''
+                },
+                trajectoryFilters: {
+                    startDate: '',
+                    endDate: '',
+                    type: 'all'
                 },
 
                 // --- COMPUTED ---
@@ -96,6 +103,40 @@
                     const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
                     return daysDiff > 0 ? daysDiff : 0;
                 },
+                get filteredTimelineEvents() {
+                    if (!this.timelineEvents) return [];
+                    return this.timelineEvents.filter(event => {
+                        // Filtro por tipo
+                        const typeMatch = this.trajectoryFilters.type === 'all' || event.type === this.trajectoryFilters.type;
+                        
+                        // Si no hay fechas, solo aplicar filtro de tipo
+                        if (!this.trajectoryFilters.startDate || !this.trajectoryFilters.endDate) {
+                            return typeMatch;
+                        }
+
+                        // Filtro por fechas - convertir fecha del evento a formato comparable
+                        const eventDateStr = event.date;
+                        // Convertir "01 de Junio, 2025" a "2025-06-01"
+                        const months = {
+                            'Enero': '01', 'Febrero': '02', 'Marzo': '03', 'Abril': '04',
+                            'Mayo': '05', 'Junio': '06', 'Julio': '07', 'Agosto': '08',
+                            'Septiembre': '09', 'Octubre': '10', 'Noviembre': '11', 'Diciembre': '12'
+                        };
+                        
+                        const parts = eventDateStr.split(' ');
+                        const day = parts[0].padStart(2, '0');
+                        const month = months[parts[2].replace(',', '')];
+                        const year = parts[3];
+                        
+                        if (!month) return typeMatch; // Si no puede parsear la fecha, solo usar filtro de tipo
+                        
+                        const eventDate = new Date(`${year}-${month}-${day}`);
+                        const startDate = new Date(this.trajectoryFilters.startDate);
+                        const endDate = new Date(this.trajectoryFilters.endDate);
+                        
+                        return typeMatch && eventDate >= startDate && eventDate <= endDate;
+                    });
+                },
 
                 // --- DATA ---
                 employee: {
@@ -134,6 +175,9 @@
                         title: 'Promoción a Analista Senior',
                         summary: 'Promoción de Analista de Nómina a Analista Senior de Nómina.',
                         icon: 'award',
+                        type: 'Movimiento IMSS',
+                        registroPatronal: 'A1234567890',
+                        loteId: 'LT-2025-06-001',
                         before: '<strong>Puesto:</strong> Analista de Nómina<br><strong>Salario Diario:</strong> $600.00',
                         after: '<strong>Puesto:</strong> Analista Senior de Nómina<br><strong>Salario Diario:</strong> $750.00'
                     },
@@ -143,6 +187,9 @@
                         title: 'Primer Aniversario',
                         summary: 'El trabajador cumplió su primer año en la compañía.',
                         icon: 'cake',
+                        type: 'Movimiento IMSS',
+                        registroPatronal: 'A1234567890',
+                        loteId: 'LT-2025-04-002',
                         before: '<strong>Antigüedad:</strong> 0 años',
                         after: '<strong>Antigüedad:</strong> 1 año'
                     },
@@ -152,6 +199,9 @@
                         title: 'Cambio Salarial',
                         summary: 'Ajuste salarial por desempeño.',
                         icon: 'trending-up',
+                        type: 'Movimiento IMSS',
+                        registroPatronal: 'A1234567890',
+                        loteId: 'LT-2025-01-003',
                         before: '<strong>Salario Diario:</strong> $551.25',
                         after: '<strong>Salario Diario:</strong> $600.00'
                     },
@@ -161,6 +211,9 @@
                         title: 'Contratación Inicial',
                         summary: 'Ingreso a la compañía como Analista de Nómina.',
                         icon: 'briefcase',
+                        type: 'Movimiento IMSS',
+                        registroPatronal: 'A1234567890',
+                        loteId: 'LT-2024-04-001',
                         before: 'N/A',
                         after: '<strong>Puesto:</strong> Analista de Nómina<br><strong>Salario Diario:</strong> $551.25'
                     }
@@ -223,9 +276,6 @@
             }));
         });
     </script>
-
-    <!-- Alpine.js Core -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <style>
         body {
@@ -357,8 +407,30 @@
 
                         <!-- Pestaña: Trayectoria y Compensación -->
                         <div x-show="activeTab === 'trayectoria'">
+                            <!-- Filtros -->
+                            <div class="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label for="trajectoryStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                        <input type="date" id="trajectoryStartDate" x-model="trajectoryFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                    </div>
+                                    <div>
+                                        <label for="trajectoryEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                        <input type="date" id="trajectoryEndDate" x-model="trajectoryFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                    </div>
+                                    <div>
+                                        <label for="trajectoryType" class="text-xs font-semibold text-slate-600">Tipo</label>
+                                        <select id="trajectoryType" x-model="trajectoryFilters.type" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                            <option value="all">Todos</option>
+                                            <option value="Movimiento IMSS">Movimiento IMSS</option>
+                                            <option value="Promociones">Promociones</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="relative pl-8 border-l-2 border-slate-200">
-                                <template x-for="(event, index) in timelineEvents" :key="event.id">
+                                <template x-for="(event, index) in filteredTimelineEvents" :key="event.id">
                                     <div class="mb-10">
                                         <div class="absolute -left-4 flex items-center justify-center w-8 h-8 bg-blue-600 rounded-full text-white">
                                             <i :data-lucide="event.icon" class="w-5 h-5"></i>
@@ -381,6 +453,25 @@
                                                         <h5 class="font-semibold text-slate-400 mb-2 text-xs">DESPUÉS</h5>
                                                         <div class="space-y-1"><p x-html="event.after"></p></div>
                                                     </div>
+                                                </div>
+                                                
+                                                <!-- Información IMSS (solo para movimientos IMSS) -->
+                                                <div x-show="event.type === 'Movimiento IMSS'" class="mt-4 pt-4 border-t border-slate-200">
+                                                    <h5 class="font-semibold text-slate-700 mb-3 text-sm">Información del Movimiento IMSS</h5>
+                                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                                                        <div>
+                                                            <span class="font-semibold text-slate-500">Registro Patronal:</span>
+                                                            <span class="ml-2 font-mono" x-text="event.registroPatronal"></span>
+                                                        </div>
+                                                        <div>
+                                                            <span class="font-semibold text-slate-500">Lote ID:</span>
+                                                            <span class="ml-2 font-mono" x-text="event.loteId"></span>
+                                                        </div>
+                                                    </div>
+                                                    <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition flex items-center">
+                                                        <i data-lucide="external-link" class="w-4 h-4 mr-2"></i>
+                                                        Ir a Acuse de movimiento afiliatorio
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
