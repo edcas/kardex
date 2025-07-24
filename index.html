@@ -3,1479 +3,749 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prototipo Kardex - BeePayroll</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Prototipo: Gestión de Incapacidades</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@0.271.0/dist/umd/lucide.js"></script>
-
-    <!-- Alpine.js Core -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-
-    <script defer>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('kardexApp', () => ({
-                // --- STATE ---
-                showFullInfo: false,
-                activeProfileTab: 'datos-personales',
-                expandedEventId: null,
-                selectedReceipts: [],
-                showPoliciesModal: false,
-                showAddVacationModal: false,
-                showInasistenciaModal: false,
-                showPermisoModal: false,
-                showIncapacidadModal: false,
-                newIncapacidad: {
-                    trabajadorSearch: '',
-                    trabajadorId: '',
-                    showTrabajadorDropdown: false,
-                    numeroIncapacidad: '',
-                    tipoIncapacidad: 'Enfermedad General',
-                    subtipoRiesgo: 'Accidente de Trabajo',
-                    fechaInicio: '',
-                    diasIncapacidad: '',
-                    fechaTermino: '',
-                    fechaExpedicion: '',
-                    modoIncapacidad: 'Inicial'
-                },
-                newPermiso: {
-                    tipo: 'Permiso',
-                    subTipo: 'Permiso sin goce de sueldo',
-                    fechaInicio: '',
-                    fechaTermino: '',
-                    inicioFechaAplicacion: '',
-                    activarSuplencia: false,
-                    colaboradorSuplente: '',
-                    comentario: ''
-                },
-                newInasistencia: {
-                    tipo: 'Inasistencia',
-                    fechaInicio: '',
-                    fechaTermino: '',
-                    inicioFechaAplicacion: '',
-                    activarSuplencia: false,
-                    colaboradorSuplente: '',
-                    comentario: ''
-                },
-                newVacation: {
-                    startDate: '',
-                    endDate: '',
-                    lastVacationPeriod: '15/06/2025 al 21/06/2025',
-                    hasReplacement: false,
-                    replacementEmployee: '',
-                    comments: ''
-                },
-                payrollFilters: {
-                    startDate: '',
-                    endDate: '',
-                    status: 'all'
-                },
-                auditLogPage: 1,
-                auditLogItemsPerPage: 5,
-                auditFilters: {
-                    startDate: '',
-                    endDate: '',
-                    description: ''
-                },
-                trajectoryFilters: {
-                    startDate: '',
-                    endDate: '',
-                    type: 'all'
-                },
-
-                // --- COMPUTED ---
-                get filteredPayrollHistory() {
-                    if (!this.payrollHistory) return [];
-                    return this.payrollHistory.filter(receipt => {
-                        const statusMatch = this.payrollFilters.status === 'all' || receipt.status === this.payrollFilters.status;
-                        
-                        if (!this.payrollFilters.startDate || !this.payrollFilters.endDate) {
-                            return statusMatch;
-                        }
-
-                        const receiptDate = new Date(receipt.payDate.split('/').reverse().join('-'));
-                        const startDate = new Date(this.payrollFilters.startDate);
-                        const endDate = new Date(this.payrollFilters.endDate);
-                        
-                        return statusMatch && receiptDate >= startDate && receiptDate <= endDate;
-                    });
-                },
-                get filteredAuditLog() {
-                    if (!this.auditLog) return [];
-                    return this.auditLog.filter(log => {
-                        // Filtro por descripción
-                        const descriptionMatch = !this.auditFilters.description || 
-                            log.description.toLowerCase().includes(this.auditFilters.description.toLowerCase());
-                        
-                        // Si no hay fechas, solo aplicar filtro de descripción
-                        if (!this.auditFilters.startDate || !this.auditFilters.endDate) {
-                            return descriptionMatch;
-                        }
-
-                        // Filtro por fechas
-                        const logDate = new Date(log.date.split('/').reverse().join('-'));
-                        const startDate = new Date(this.auditFilters.startDate);
-                        const endDate = new Date(this.auditFilters.endDate);
-                        
-                        return descriptionMatch && logDate >= startDate && logDate <= endDate;
-                    });
-                },
-                get totalAuditPages() {
-                    return Math.ceil(this.filteredAuditLog.length / this.auditLogItemsPerPage);
-                },
-                get paginatedAuditLog() {
-                    const start = (this.auditLogPage - 1) * this.auditLogItemsPerPage;
-                    const end = start + this.auditLogItemsPerPage;
-                    return this.filteredAuditLog.slice(start, end);
-                },
-                get vacationDays() {
-                    if (!this.newVacation.startDate || !this.newVacation.endDate) return 0;
-                    const startDate = new Date(this.newVacation.startDate);
-                    const endDate = new Date(this.newVacation.endDate);
-                    const timeDiff = endDate.getTime() - startDate.getTime();
-                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-                    return daysDiff > 0 ? daysDiff : 0;
-                },
-                get inasistenciaDays() {
-                    if (!this.newInasistencia.fechaInicio || !this.newInasistencia.fechaTermino) return 0;
-                    const startDate = new Date(this.newInasistencia.fechaInicio);
-                    const endDate = new Date(this.newInasistencia.fechaTermino);
-                    const timeDiff = endDate.getTime() - startDate.getTime();
-                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-                    return daysDiff > 0 ? daysDiff : 0;
-                },
-                get permisoDays() {
-                    if (!this.newPermiso.fechaInicio || !this.newPermiso.fechaTermino) return 0;
-                    const startDate = new Date(this.newPermiso.fechaInicio);
-                    const endDate = new Date(this.newPermiso.fechaTermino);
-                    const timeDiff = endDate.getTime() - startDate.getTime();
-                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-                    return daysDiff > 0 ? daysDiff : 0;
-                },
-                get calculatedEndDate() {
-                    if (!this.newIncapacidad.fechaInicio || !this.newIncapacidad.diasIncapacidad) return '';
-                    const startDate = new Date(this.newIncapacidad.fechaInicio);
-                    const days = parseInt(this.newIncapacidad.diasIncapacidad) - 1; // -1 porque el primer día cuenta
-                    startDate.setDate(startDate.getDate() + days);
-                    return startDate.toISOString().split('T')[0];
-                },
-                get filteredTimelineEvents() {
-                    if (!this.timelineEvents) return [];
-                    return this.timelineEvents.filter(event => {
-                        // Filtro por tipo
-                        const typeMatch = this.trajectoryFilters.type === 'all' || event.type === this.trajectoryFilters.type;
-                        
-                        // Si no hay fechas, solo aplicar filtro de tipo
-                        if (!this.trajectoryFilters.startDate || !this.trajectoryFilters.endDate) {
-                            return typeMatch;
-                        }
-
-                        // Filtro por fechas - convertir fecha del evento a formato comparable
-                        const eventDateStr = event.date;
-                        // Convertir "01 de Junio, 2025" a "2025-06-01"
-                        const months = {
-                            'Enero': '01', 'Febrero': '02', 'Marzo': '03', 'Abril': '04',
-                            'Mayo': '05', 'Junio': '06', 'Julio': '07', 'Agosto': '08',
-                            'Septiembre': '09', 'Octubre': '10', 'Noviembre': '11', 'Diciembre': '12'
-                        };
-                        
-                        const parts = eventDateStr.split(' ');
-                        const day = parts[0].padStart(2, '0');
-                        const month = months[parts[2].replace(',', '')];
-                        const year = parts[3];
-                        
-                        if (!month) return typeMatch; // Si no puede parsear la fecha, solo usar filtro de tipo
-                        
-                        const eventDate = new Date(`${year}-${month}-${day}`);
-                        const startDate = new Date(this.trajectoryFilters.startDate);
-                        const endDate = new Date(this.trajectoryFilters.endDate);
-                        
-                        return typeMatch && eventDate >= startDate && eventDate <= endDate;
-                    });
-                },
-                get filteredTrabajadores() {
-                    if (!this.newIncapacidad.trabajadorSearch || this.newIncapacidad.trabajadorSearch.length < 2) return [];
-                    const searchTerm = this.newIncapacidad.trabajadorSearch.toLowerCase();
-                    return this.trabajadores.filter(trabajador => 
-                        trabajador.nombre.toLowerCase().includes(searchTerm) ||
-                        trabajador.puesto.toLowerCase().includes(searchTerm) ||
-                        trabajador.departamento.toLowerCase().includes(searchTerm)
-                    ).slice(0, 5); // Limitar a 5 resultados
-                },
-
-                // --- DATA ---
-                employee: {
-                    name: 'ANTONIO SANCHEZ AQUIQUE',
-                    hireDate: '19/04/2024',
-                    address: 'Calle Falsa 123, Colonia Centro, Ciudad de México, CP 06000',
-                    phone: '55 1234 5678',
-                    email: 'antonio.sanchez@example.com',
-                    contractType: 'Contrato de trabajo por tiempo indeterminado',
-                    salary: '$551.25',
-                    bankAccount: '...6789',
-                    curp: 'SAAA741128HDFNQN04',
-                    rfc: 'SAAA741128CT4',
-                    nss: '39997418715',
-                    birthDate: '28/11/1974',
-                    gender: 'Masculino',
-                    maritalStatus: 'Soltero(a)',
-                    systemId: 'CDMX48690',
-                    seniorityDate: '19/04/2024',
-                    workdayType: 'Diurna',
-                    avatar: 'https://placehold.co/100x100/E0E7FF/4338CA?text=AS'
-                },
-                employeeBankData: {
-                    banco: 'BBVA México',
-                    numeroCuenta: '0123456789',
-                    clabe: '012180001234567890',
-                    tipoMovimiento: 'Depósito',
-                    metodoPago: 'Transferencia bancaria'
-                },
-                employeeDeducciones: [
-                    { concepto: 'Préstamo personal', monto: '$2,500.00', tipo: 'Fijo', activo: true },
-                    { concepto: 'Seguro de vida', monto: '$350.00', tipo: 'Fijo', activo: true },
-                    { concepto: 'Fondo de ahorro', monto: '$1,200.00', tipo: 'Porcentual', activo: true },
-                    { concepto: 'Cuota sindical', monto: '$180.00', tipo: 'Fijo', activo: false }
-                ],
-                profileTabs: [
-                    { id: 'datos-personales', name: 'Datos Personales' },
-                    { id: 'datos-laborales', name: 'Datos Laborales' },
-                    { id: 'datos-bancarios', name: 'Datos Bancarios' },
-                    { id: 'deducciones', name: 'Deducciones' }
-                ],
-                timelineEvents: [
-                    {
-                        id: 4,
-                        date: '01 de Junio, 2025',
-                        title: 'Promoción a Analista Senior',
-                        summary: 'Promoción de Analista de Nómina a Analista Senior de Nómina.',
-                        icon: 'award',
-                        type: 'Movimiento IMSS',
-                        registroPatronal: 'A1234567890',
-                        loteId: 'LT-2025-06-001',
-                        before: '<strong>Puesto:</strong> Analista de Nómina<br><strong>Salario Diario:</strong> $600.00',
-                        after: '<strong>Puesto:</strong> Analista Senior de Nómina<br><strong>Salario Diario:</strong> $750.00'
-                    },
-                    {
-                        id: 3,
-                        date: '19 de Abril, 2025',
-                        title: 'Primer Aniversario',
-                        summary: 'El trabajador cumplió su primer año en la compañía.',
-                        icon: 'cake',
-                        type: 'Movimiento IMSS',
-                        registroPatronal: 'A1234567890',
-                        loteId: 'LT-2025-04-002',
-                        before: '<strong>Antigüedad:</strong> 0 años',
-                        after: '<strong>Antigüedad:</strong> 1 año'
-                    },
-                    {
-                        id: 1,
-                        date: '01 de Enero, 2025',
-                        title: 'Cambio Salarial',
-                        summary: 'Ajuste salarial por desempeño.',
-                        icon: 'trending-up',
-                        type: 'Movimiento IMSS',
-                        registroPatronal: 'A1234567890',
-                        loteId: 'LT-2025-01-003',
-                        before: '<strong>Salario Diario:</strong> $551.25',
-                        after: '<strong>Salario Diario:</strong> $600.00'
-                    },
-                    {
-                        id: 2,
-                        date: '19 de Abril, 2024',
-                        title: 'Contratación Inicial',
-                        summary: 'Ingreso a la compañía como Analista de Nómina.',
-                        icon: 'briefcase',
-                        type: 'Movimiento IMSS',
-                        registroPatronal: 'A1234567890',
-                        loteId: 'LT-2024-04-001',
-                        before: 'N/A',
-                        after: '<strong>Puesto:</strong> Analista de Nómina<br><strong>Salario Diario:</strong> $551.25'
-                    }
-                ],
-                payrollHistory: [
-                    { id: 1, period: '1ra Quincena Julio 2025', payDate: '15/07/2025', netAmount: '$8,580.50', status: 'Timbrado' },
-                    { id: 2, period: '2da Quincena Junio 2025', payDate: '30/06/2025', netAmount: '$8,550.00', status: 'Timbrado' },
-                    { id: 3, period: '1ra Quincena Junio 2025', payDate: '15/06/2025', netAmount: '$8,550.00', status: 'Timbrado' },
-                    { id: 4, period: '2da Quincena Mayo 2025', payDate: '31/05/2025', netAmount: '$0.00', status: 'Cancelado' },
-                    { id: 5, period: '1ra Quincena Mayo 2025', payDate: '15/05/2025', netAmount: '$8,550.00', status: 'Timbrado' },
-                ],
-                digitalFile: [
-                    { id: 1, name: 'Contrato de Trabajo.pdf' },
-                    { id: 2, name: 'Identificación Oficial (INE).pdf' },
-                    { id: 3, name: 'Constancia de Situación Fiscal.pdf' },
-                    { id: 4, name: 'Comprobante de Domicilio.pdf' },
-                    { id: 5, name: 'CURP.pdf' },
-                ],
-                attendanceHistory: [
-                    { id: 1, type: 'Día de cumpleaños', startDate: '13-08-2025', endDate: '13-08-2025', days: 1, status: 'Aprobado' },
-                    { id: 2, type: 'Inasistencia', startDate: '22-07-2025', endDate: '22-07-2025', days: 1, status: 'Aprobado' },
-                    { id: 3, type: 'Permiso con goce', startDate: '10-07-2025', endDate: '10-07-2025', days: 1, status: 'Aprobado' },
-                    { id: 4, type: 'Incapacidad', startDate: '09-07-2025', endDate: '09-07-2025', days: 1, status: 'Aprobado' },
-                ],
-                vacationPolicies: [
-                    { years: 1.0, days: 12, prima: 0.25, aguinaldo: 15},
-                    { years: 2.0, days: 14, prima: 0.25, aguinaldo: 15},
-                    { years: 3.0, days: 16, prima: 0.25, aguinaldo: 15},
-                    { years: 4.0, days: 18, prima: 0.25, aguinaldo: 15},
-                    { years: 5.0, days: 20, prima: 0.25, aguinaldo: 15},
-                    { years: '6.0 - 10.0', days: 22, prima: 0.25, aguinaldo: 15},
-                    { years: '11.0 - 15.0', days: 24, prima: 0.25, aguinaldo: 15},
-                ],
-                auditLog: [
-                    { id: 1, description: 'Creó nuevo trabajador con ID 15078', user: 'Eduardo Castillo', role: 'Administrador', date: '01/08/2025', time: '14:23:14', valueBefore: '-', valueAfter: 'ID: 15078', endpoint: '/api/users/new/1754', ip: '192.168.56.82' },
-                    { id: 2, description: 'Modificó salario de trabajador ID 15078', user: 'Laura Méndez', role: 'Nómina', date: '02/08/2025', time: '10:05:30', valueBefore: '$551.25', valueAfter: '$600.00', endpoint: '/api/users/1754/salary', ip: '192.168.56.88' },
-                    { id: 3, description: 'Descargó recibo de nómina Q15 Julio', user: 'ANTONIO SANCHEZ AQUIQUE', role: 'Empleado', date: '02/08/2025', time: '11:15:01', valueBefore: '-', valueAfter: '-', endpoint: '/api/paystubs/download/123', ip: '200.5.8.1' },
-                    { id: 4, description: 'Aprobó solicitud de vacaciones', user: 'Jefe Inmediato', role: 'Gerente', date: '03/08/2025', time: '09:30:00', valueBefore: 'Pendiente', valueAfter: 'Aprobada', endpoint: '/api/vacations/approve/45', ip: '192.168.56.91' },
-                    { id: 5, description: 'Actualizó domicilio de trabajador ID 15078', user: 'Eduardo Castillo', role: 'Administrador', date: '04/08/2025', time: '16:45:10', valueBefore: 'Calle Antigua 456', valueAfter: 'Calle Falsa 123', endpoint: '/api/users/1754/address', ip: '192.168.56.82' },
-                    { id: 6, description: 'Generó reporte de auditoría', user: 'Eduardo Castillo', role: 'Administrador', date: '05/08/2025', time: '12:00:00', valueBefore: '-', valueAfter: '-', endpoint: '/api/reports/audit', ip: '192.168.56.82' },
-                ],
-                trabajadores: [
-                    { id: 1, nombre: 'ANTONIO SANCHEZ AQUIQUE', puesto: 'Analista de Nómina', departamento: 'Recursos Humanos' },
-                    { id: 2, nombre: 'Ana Eugenia Reyes Castellanos', puesto: 'Coordinadora', departamento: 'Finanzas' },
-                    { id: 3, nombre: 'Victoria Castro Rojas', puesto: 'Asistente', departamento: 'Administración' },
-                    { id: 4, nombre: 'Juan Pérez García', puesto: 'Desarrollador', departamento: 'Tecnología' },
-                    { id: 5, nombre: 'María García López', puesto: 'Contadora', departamento: 'Finanzas' },
-                    { id: 6, nombre: 'Carlos Rodríguez Martín', puesto: 'Gerente', departamento: 'Ventas' },
-                    { id: 7, nombre: 'Laura Méndez Torres', puesto: 'Analista', departamento: 'Recursos Humanos' },
-                    { id: 8, nombre: 'Pedro Morales Silva', puesto: 'Supervisor', departamento: 'Operaciones' },
-                    { id: 9, nombre: 'Ana Prueba X', puesto: 'Especialista', departamento: 'Marketing' },
-                    { id: 10, nombre: 'Roberto Jiménez Cruz', puesto: 'Técnico', departamento: 'Soporte' }
-                ],
-                
-                // --- METHODS ---
-                toggleAllReceipts(event) {
-                    if (event.target.checked) {
-                        this.selectedReceipts = this.filteredPayrollHistory.map(r => r.id);
-                    } else {
-                        this.selectedReceipts = [];
-                    }
-                },
-                selectTrabajador(trabajador) {
-                    this.newIncapacidad.trabajadorSearch = trabajador.nombre;
-                    this.newIncapacidad.trabajadorId = trabajador.id;
-                    this.newIncapacidad.showTrabajadorDropdown = false;
-                },
-                init() {
-                    lucide.createIcons();
-                    this.$watch('filteredPayrollHistory', () => {
-                        this.$nextTick(() => lucide.createIcons());
-                    });
-                    
-                    // Inicializar navegación de secciones
-                    this.$nextTick(() => {
-                        this.initSectionNavigation();
-                    });
-                },
-                initSectionNavigation() {
-                    const navLinks = document.querySelectorAll('.secondary-nav a');
-                    const contentSections = document.querySelectorAll('.content-section');
-
-                    navLinks.forEach(link => {
-                        link.addEventListener('click', (e) => {
-                            e.preventDefault();
-
-                            // Gestionar el estado activo en los links
-                            navLinks.forEach(item => item.classList.remove('active'));
-                            link.classList.add('active');
-
-                            // Obtener el ID del contenido a mostrar
-                            const targetId = link.getAttribute('href').substring(1);
-                            
-                            // Mostrar/Ocultar las secciones de contenido
-                            contentSections.forEach(section => {
-                                if (section.id === targetId) {
-                                    section.classList.add('active');
-                                } else {
-                                    section.classList.remove('active');
-                                }
-                            });
-                            
-                            // Recrear iconos después del cambio
-                            this.$nextTick(() => lucide.createIcons());
-                        });
-                    });
-                }
-            }));
-        });
-    </script>
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
-        [x-cloak] { display: none !important; }
-        .secondary-nav a:hover {
-            background-color: #f1f5f9; /* slate-100 */
+        .modal-backdrop, .sidebar-backdrop {
+            transition: opacity 0.3s ease;
         }
-        .secondary-nav a.active {
-            background-color: #eef2ff; /* indigo-50 */
-            color: #4f46e5; /* indigo-600 */
-            font-weight: 600;
-            border-right: 3px solid #4f46e5;
+        .modal-content, .sidebar-content {
+            transition: transform 0.3s ease;
         }
-        .content-section {
-            display: none;
+        .error-message {
+            animation: shake 0.5s;
         }
-        .content-section.active {
-            display: block;
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
-        .profile-tab-active {
-            border-bottom: 3px solid #2563EB;
-            color: #2563EB;
-            font-weight: 600;
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
         }
-        .profile-tab-inactive {
-            border-bottom: 3px solid transparent;
-            color: #475569;
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
         }
     </style>
 </head>
-<body class="bg-slate-100">
+<body class="bg-gray-900 text-gray-300">
 
-    <div class="flex flex-col h-screen">
-        <!-- Top Header Bar -->
-        <header class="bg-white border-b border-slate-200 w-full flex-shrink-0">
-            <div class="flex items-center justify-between h-16 px-8">
-                <div class="flex items-center space-x-4">
-                    <button class="text-slate-500"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
-                    <span class="text-lg font-bold text-slate-800">Bee Payroll</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                        A
-                    </div>
-                </div>
-            </div>
+    <!-- Main Content -->
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Cálculo de Incapacidades</h1>
+            <p class="text-gray-400">Cliente: Soluciones Tech Global S.A. de C.V.</p>
         </header>
-        
-        <div class="flex flex-1 overflow-hidden" x-data="kardexApp" x-init="init()" x-cloak>
-            <!-- Main Sidebar (for context) -->
-            <aside class="w-64 bg-white shadow-md flex-shrink-0">
-                <nav class="p-4 space-y-2 mt-4">
-                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="layout-dashboard" class="w-5 h-5 mr-3"></i> Panel Principal</a>
-                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="building" class="w-5 h-5 mr-3"></i> Empresa</a>
-                    <a href="#" class="flex items-center p-2 bg-blue-100 text-blue-700 font-semibold rounded-md"><i data-lucide="users" class="w-5 h-5 mr-3"></i> Trabajadores</a>
-                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="file-text" class="w-5 h-5 mr-3"></i> Nóminas</a>
-                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="bar-chart-3" class="w-5 h-5 mr-3"></i> Reportes</a>
-                    <a href="#" class="flex items-center p-2 text-slate-700 rounded-md hover:bg-slate-100"><i data-lucide="settings" class="w-5 h-5 mr-3"></i> Configuración</a>
-                </nav>
-            </aside>
 
-            <!-- Main Content -->
-            <main class="flex-1 overflow-y-auto">
-                <div class="p-8">
-                    <!-- Header -->
-                    <div class="flex items-start space-x-6">
-                        <img :src="employee.avatar" alt="Foto de perfil" class="w-24 h-24 rounded-full border-4 border-white shadow-md">
-                        <div class="flex-1">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <h1 class="text-2xl font-bold text-slate-800" x-text="`Detalles del trabajador ${employee.name}`"></h1>
-                                    <p class="text-sm text-slate-500" x-text="`Activo desde: ${employee.hireDate}`"></p>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
-                                    <button class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i>Editar</button>
-                                    <button class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition flex items-center"><i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>Eliminar</button>
-                                </div>
-                            </div>
-                            <p class="text-sm text-slate-500 mt-2">Trabajadores > <span class="font-semibold text-slate-700" x-text="`Detalles del trabajador ${employee.name}`"></span></p>
-                        </div>
-                    </div>
-
-                    <!-- Alert Boxes -->
-                    <div class="mt-6 space-y-3">
-                        <div class="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-r-lg flex items-center">
-                            <i data-lucide="alert-triangle" class="w-5 h-5 mr-3"></i>
-                            <p class="text-sm">El puesto de este trabajador no se encuentra en el listado de puestos por empresa</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Contenedor del Perfil (Navegación Secundaria + Contenido) -->
-                    <div class="mt-8 flex space-x-8">
-                        <!-- Navegación Vertical Secundaria -->
-                        <nav class="secondary-nav w-1/4 lg:w-1/5 flex-shrink-0">
-                            <div class="space-y-1">
-                                <a href="#perfil-general" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg active">
-                                    <i data-lucide="user-circle" class="w-5 h-5 mr-3"></i> Perfil General
-                                </a>
-                                <a href="#trayectoria" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="trending-up" class="w-5 h-5 mr-3"></i> Trayectoria y Compensación
-                                </a>
-                                <a href="#nomina" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="landmark" class="w-5 h-5 mr-3"></i> Historial de Pagos
-                                </a>
-                                <a href="#asistencia" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="calendar-check" class="w-5 h-5 mr-3"></i> Asistencia e Incapacidades
-                                </a>
-                                <a href="#vacaciones" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="plane" class="w-5 h-5 mr-3"></i> Gestión de Vacaciones
-                                </a>
-                                <a href="#documentos" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="folder-kanban" class="w-5 h-5 mr-3"></i> Expediente Digital
-                                </a>
-                                <a href="#auditoria" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="shield-check" class="w-5 h-5 mr-3"></i> Auditoría
-                                </a>
-                            </div>
-                        </nav>
-                        
-                        <!-- Contenido de la Sección -->
-                        <div class="flex-1">
-                            <!-- Pestaña: Perfil General -->
-                            <div id="perfil-general" class="content-section active">
-                                <!-- Sub-navegación de pestañas para Perfil General -->
-                                <nav class="border-b border-slate-200 mb-6">
-                                    <div class="flex space-x-8">
-                                        <template x-for="tab in profileTabs" :key="tab.id">
-                                            <button @click="activeProfileTab = tab.id" 
-                                                    :class="activeProfileTab === tab.id ? 'profile-tab-active' : 'profile-tab-inactive'" 
-                                                    class="py-3 px-1 text-sm transition-colors duration-200" 
-                                                    x-text="tab.name">
-                                            </button>
-                                        </template>
-                                    </div>
-                                </nav>
-
-                                <!-- Contenido de las sub-pestañas -->
-                                <div>
-                                    <!-- Datos Personales -->
-                                    <div x-show="activeProfileTab === 'datos-personales'">
-                                        <div class="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                                <i data-lucide="user" class="w-5 h-5 mr-3 text-blue-600"></i>
-                                                Datos Personales
-                                            </h3>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                                                <div><strong class="text-slate-500 block">Nombre Completo</strong> <span x-text="employee.name"></span></div>
-                                                <div><strong class="text-slate-500 block">CURP</strong> <span x-text="employee.curp"></span></div>
-                                                <div><strong class="text-slate-500 block">RFC</strong> <span x-text="employee.rfc"></span></div>
-                                                <div><strong class="text-slate-500 block">Fecha de Nacimiento</strong> <span x-text="employee.birthDate"></span></div>
-                                                <div><strong class="text-slate-500 block">Género</strong> <span x-text="employee.gender"></span></div>
-                                                <div><strong class="text-slate-500 block">Estado Civil</strong> <span x-text="employee.maritalStatus"></span></div>
-                                                <div><strong class="text-slate-500 block">Dirección</strong> <span x-text="employee.address"></span></div>
-                                                <div><strong class="text-slate-500 block">Teléfono</strong> <span x-text="employee.phone"></span></div>
-                                                <div><strong class="text-slate-500 block">Correo Electrónico</strong> <span x-text="employee.email"></span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Datos Laborales -->
-                                    <div x-show="activeProfileTab === 'datos-laborales'">
-                                        <div class="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                                <i data-lucide="briefcase" class="w-5 h-5 mr-3 text-blue-600"></i>
-                                                Datos Laborales
-                                            </h3>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                                                <div><strong class="text-slate-500 block">ID Empleado Sistema</strong> <span x-text="employee.systemId"></span></div>
-                                                <div><strong class="text-slate-500 block">Fecha de Contratación</strong> <span x-text="employee.hireDate"></span></div>
-                                                <div><strong class="text-slate-500 block">Fecha de Antigüedad</strong> <span x-text="employee.seniorityDate"></span></div>
-                                                <div><strong class="text-slate-500 block">Tipo de Contrato</strong> <span x-text="employee.contractType"></span></div>
-                                                <div><strong class="text-slate-500 block">Tipo de Jornada</strong> <span x-text="employee.workdayType"></span></div>
-                                                <div><strong class="text-slate-500 block">Salario Diario</strong> <span x-text="employee.salary"></span></div>
-                                                <div><strong class="text-slate-500 block">NSS</strong> <span x-text="employee.nss"></span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Datos Bancarios -->
-                                    <div x-show="activeProfileTab === 'datos-bancarios'">
-                                        <div class="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                                <i data-lucide="credit-card" class="w-5 h-5 mr-3 text-blue-600"></i>
-                                                Datos Bancarios
-                                            </h3>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                                                <div><strong class="text-slate-500 block">Banco</strong> <span x-text="employeeBankData.banco"></span></div>
-                                                <div><strong class="text-slate-500 block">Número de Cuenta</strong> **** <span x-text="employeeBankData.numeroCuenta.slice(-4)"></span></div>
-                                                <div><strong class="text-slate-500 block">CLABE</strong> <span x-text="employeeBankData.clabe"></span></div>
-                                                <div><strong class="text-slate-500 block">Tipo de Movimiento</strong> <span x-text="employeeBankData.tipoMovimiento"></span></div>
-                                                <div><strong class="text-slate-500 block">Método de Pago</strong> <span x-text="employeeBankData.metodoPago"></span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Deducciones -->
-                                    <div x-show="activeProfileTab === 'deducciones'">
-                                        <div class="bg-white p-6 rounded-lg shadow-sm">
-                                            <div class="flex justify-between items-center mb-4">
-                                                <h3 class="text-lg font-bold text-slate-800 flex items-center">
-                                                    <i data-lucide="minus-circle" class="w-5 h-5 mr-3 text-blue-600"></i>
-                                                    Deducciones
-                                                </h3>
-                                                <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                                    <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
-                                                    Agregar Deducción
-                                                </button>
-                                            </div>
-                                            <div class="overflow-x-auto">
-                                                <table class="w-full text-sm">
-                                                    <thead class="text-left text-slate-500 bg-slate-50">
-                                                        <tr>
-                                                            <th class="p-3 font-semibold">Concepto</th>
-                                                            <th class="p-3 font-semibold">Monto</th>
-                                                            <th class="p-3 font-semibold">Tipo</th>
-                                                            <th class="p-3 font-semibold">Estado</th>
-                                                            <th class="p-3 font-semibold text-center">Acciones</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <template x-for="deduccion in employeeDeducciones" :key="deduccion.concepto">
-                                                            <tr class="border-t border-slate-200">
-                                                                <td class="p-3 font-semibold" x-text="deduccion.concepto"></td>
-                                                                <td class="p-3" x-text="deduccion.monto"></td>
-                                                                <td class="p-3" x-text="deduccion.tipo"></td>
-                                                                <td class="p-3">
-                                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full"
-                                                                          :class="deduccion.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                                                                          x-text="deduccion.activo ? 'Activo' : 'Inactivo'">
-                                                                      </span>
-                                                                </td>
-                                                                <td class="p-3">
-                                                                    <div class="flex justify-center space-x-2 text-slate-500">
-                                                                        <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                                                                        <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        </template>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Trayectoria y Compensación -->
-                            <div id="trayectoria" class="content-section">
-                                <!-- Filtros -->
-                                <div class="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label for="trajectoryStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
-                                            <input type="date" id="trajectoryStartDate" x-model="trajectoryFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                        </div>
-                                        <div>
-                                            <label for="trajectoryEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
-                                            <input type="date" id="trajectoryEndDate" x-model="trajectoryFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                        </div>
-                                        <div>
-                                            <label for="trajectoryType" class="text-xs font-semibold text-slate-600">Tipo</label>
-                                            <select id="trajectoryType" x-model="trajectoryFilters.type" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                <option value="all">Todos</option>
-                                                <option value="Movimiento IMSS">Movimiento IMSS</option>
-                                                <option value="Promociones">Promociones</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="relative pl-8 border-l-2 border-slate-200">
-                                    <template x-for="(event, index) in filteredTimelineEvents" :key="event.id">
-                                        <div class="mb-10">
-                                            <div class="absolute -left-4 flex items-center justify-center w-8 h-8 bg-blue-600 rounded-full text-white">
-                                                <i :data-lucide="event.icon" class="w-5 h-5"></i>
-                                            </div>
-                                            <div class="bg-white p-5 rounded-lg shadow-sm ml-8">
-                                                <p class="text-xs text-slate-500" x-text="event.date"></p>
-                                                <h4 class="font-bold mt-1 text-slate-800" x-text="event.title"></h4>
-                                                <p class="text-sm text-slate-600 mt-1" x-text="event.summary"></p>
-                                                <button @click="expandedEventId = (expandedEventId === event.id ? null : event.id)" class="text-blue-600 text-sm font-semibold mt-3">
-                                                    <span x-show="expandedEventId !== event.id">Ver Detalles...</span>
-                                                    <span x-show="expandedEventId === event.id">Ocultar Detalles</span>
-                                                </button>
-                                                <div x-show="expandedEventId === event.id" x-collapse>
-                                                    <div class="mt-4 pt-4 border-t border-slate-200 grid grid-cols-2 gap-4 text-sm">
-                                                        <div>
-                                                            <h5 class="font-semibold text-slate-400 mb-2 text-xs">ANTES</h5>
-                                                            <div class="space-y-1"><p x-html="event.before"></p></div>
-                                                        </div>
-                                                        <div>
-                                                            <h5 class="font-semibold text-slate-400 mb-2 text-xs">DESPUÉS</h5>
-                                                            <div class="space-y-1"><p x-html="event.after"></p></div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <!-- Información IMSS (solo para movimientos IMSS) -->
-                                                    <div x-show="event.type === 'Movimiento IMSS'" class="mt-4 pt-4 border-t border-slate-200">
-                                                        <h5 class="font-semibold text-slate-700 mb-3 text-sm">Información del Movimiento IMSS</h5>
-                                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
-                                                            <div>
-                                                                <span class="font-semibold text-slate-500">Registro Patronal:</span>
-                                                                <span class="ml-2 font-mono" x-text="event.registroPatronal"></span>
-                                                            </div>
-                                                            <div>
-                                                                <span class="font-semibold text-slate-500">Lote ID:</span>
-                                                                <span class="ml-2 font-mono" x-text="event.loteId"></span>
-                                                            </div>
-                                                        </div>
-                                                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition flex items-center">
-                                                            <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                                            Descargar acuse de movimiento afiliatorio
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Historial de Pagos -->
-                            <div id="nomina" class="content-section">
-                                <div class="bg-white p-6 rounded-lg shadow-sm">
-                                    
-                                    
-                                    <!-- Filters and Actions -->
-                                    <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                                            <div>
-                                                <label for="startDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
-                                                <input type="date" id="startDate" x-model="payrollFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                            </div>
-                                            <div>
-                                                <label for="endDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
-                                                <input type="date" id="endDate" x-model="payrollFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                            </div>
-                                            <div>
-                                                <label for="statusFilter" class="text-xs font-semibold text-slate-600">Estado</label>
-                                                <select id="statusFilter" x-model="payrollFilters.status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    <option value="all">Todos</option>
-                                                    <option value="Timbrado">Timbrados</option>
-                                                    <option value="Cancelado">Cancelados</option>
-                                                </select>
-                                            </div>
-                                            <button 
-                                                :disabled="selectedReceipts.length === 0" 
-                                                class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center justify-center disabled:bg-slate-300 disabled:cursor-not-allowed">
-                                                <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                                <span x-text="`Descargar ${selectedReceipts.length} timbres`"></span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-4 overflow-x-auto">
-                                        <table class="w-full text-sm">
-                                            <thead class="text-left text-slate-500 bg-slate-50">
-                                                <tr>
-                                                    <th class="p-3 w-10 text-center"><input type="checkbox" @change="toggleAllReceipts($event)" class="rounded border-slate-300"></th>
-                                                    <th class="p-3 font-semibold">Periodo</th>
-                                                    <th class="p-3 font-semibold">Fecha de Pago</th>
-                                                    <th class="p-3 font-semibold">Estado</th>
-                                                    <th class="p-3 font-semibold text-right">Neto Pagado</th>
-                                                    <th class="p-3 font-semibold text-center">Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <template x-for="receipt in filteredPayrollHistory" :key="receipt.id">
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3 text-center"><input type="checkbox" :value="receipt.id" x-model="selectedReceipts" class="rounded border-slate-300"></td>
-                                                        <td class="p-3" x-text="receipt.period"></td>
-                                                        <td class="p-3" x-text="receipt.payDate"></td>
-                                                        <td class="p-3">
-                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full"
-                                                                :class="{
-                                                                    'bg-green-100 text-green-800': receipt.status === 'Timbrado',
-                                                                    'bg-red-100 text-red-800': receipt.status === 'Cancelado'
-                                                                }"
-                                                                x-text="receipt.status">
-                                                            </span>
-                                                        </td>
-                                                        <td class="p-3 text-right font-mono" x-text="receipt.netAmount"></td>
-                                                        <td class="p-3" x-data="{ open: false }">
-                                                            <div class="relative flex justify-center">
-                                                                <button @click="open = !open" class="p-2 text-slate-500 hover:text-blue-600"><i data-lucide="more-vertical" class="w-5 h-5"></i></button>
-                                                                <div x-show="open" @click.outside="open = false" x-transition class="absolute z-10 right-0 mt-10 w-48 bg-white rounded-md shadow-lg border border-slate-200">
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar PDF</a>
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar XML</a>
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar .ZIP</a>
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Ir a la nómina</a>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </template>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Asistencia e Incapacidades -->
-                            <div id="asistencia" class="content-section">
-                                 <div class="bg-white p-6 rounded-lg shadow-sm">
-                                    <div class="flex justify-between items-center">
-                                        <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="calendar-check" class="w-6 h-6 mr-3 text-blue-600"></i>Asistencia e Incapacidades</h2>
-                                        <div class="relative" x-data="{ openAbsenceDropdown: false }">
-                                            <button @click="openAbsenceDropdown = !openAbsenceDropdown" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                                <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
-                                                Registrar Ausencia
-                                                <i data-lucide="chevron-down" class="w-4 h-4 ml-2"></i>
-                                            </button>
-                                            <div x-show="openAbsenceDropdown" @click.outside="openAbsenceDropdown = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-10">
-                                                <a href="#" @click="openAbsenceDropdown = false; showInasistenciaModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
-                                                    <i data-lucide="x-circle" class="w-4 h-4 mr-2 text-red-500"></i>
-                                                    Inasistencia
-                                                </a>
-                                                <a href="#" @click="openAbsenceDropdown = false; showIncapacidadModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
-                                                    <i data-lucide="heart-pulse" class="w-4 h-4 mr-2 text-orange-500"></i>
-                                                    Incapacidad
-                                                </a>
-                                                <a href="#" @click="openAbsenceDropdown = false; showPermisoModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
-                                                    <i data-lucide="clock" class="w-4 h-4 mr-2 text-blue-500"></i>
-                                                    Permiso
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-8 overflow-x-auto">
-                                        <table class="w-full text-sm">
-                                            <thead class="text-left text-slate-500 bg-slate-50">
-                                                <tr>
-                                                    <th class="p-3 font-semibold">Tipo</th>
-                                                    <th class="p-3 font-semibold">Fecha inicio</th>
-                                                    <th class="p-3 font-semibold">Fecha término</th>
-                                                    <th class="p-3 font-semibold">Días</th>
-                                                    <th class="p-3 font-semibold">Estado</th>
-                                                    <th class="p-3 font-semibold text-center">Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <template x-for="item in attendanceHistory" :key="item.id">
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3 font-semibold" x-text="item.type"></td>
-                                                        <td class="p-3" x-text="item.startDate"></td>
-                                                        <td class="p-3" x-text="item.endDate"></td>
-                                                        <td class="p-3" x-text="item.days"></td>
-                                                        <td class="p-3">
-                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800" x-text="item.status"></span>
-                                                        </td>
-                                                        <td class="p-3">
-                                                            <div class="flex justify-center space-x-2 text-slate-500">
-                                                                <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </template>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Gestión de Vacaciones -->
-                            <div id="vacaciones" class="content-section">
-                                <div class="space-y-6">
-                                    <div class="bg-white p-6 rounded-lg shadow-sm">
-                                        <div class="flex justify-between items-center">
-                                            <h2 class="text-lg font-bold text-slate-800">Resumen de Vacaciones</h2>
-                                            <div class="flex items-center space-x-2">
-                                                <button @click="showPoliciesModal = true" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Ver Prestaciones</button>
-                                                <button class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Modificar Prestaciones</button>
-                                            </div>
-                                        </div>
-                                        <!-- New Vacation Balance Layout -->
-                                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                                            <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                                                <p class="text-sm text-blue-800 font-semibold">Total Saldo</p>
-                                                <p class="text-3xl font-bold text-blue-600 mt-1">11.0</p>
-                                                <p class="text-xs text-slate-500">Días disponibles</p>
-                                            </div>
-                                            <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
-                                                <p class="text-sm text-green-800 font-semibold">Acumuladas</p>
-                                                <p class="text-3xl font-bold text-green-600 mt-1">14.0</p>
-                                                <p class="text-xs text-slate-500">Días ganados por ley</p>
-                                            </div>
-                                            <div class="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                                                <p class="text-sm text-amber-800 font-semibold">Tomadas</p>
-                                                <p class="text-3xl font-bold text-amber-600 mt-1">1.0</p>
-                                                <p class="text-xs text-slate-500">Días ya disfrutados</p>
-                                            </div>
-                                            <div class="bg-red-50 border border-red-200 p-4 rounded-lg">
-                                                <p class="text-sm text-red-800 font-semibold">Vencidas</p>
-                                                <p class="text-3xl font-bold text-red-600 mt-1">2.0</p>
-                                                <p class="text-xs text-slate-500">Periodos expirados</p>
-                                            </div>
-                                            <div class="bg-slate-50 border border-slate-200 p-4 rounded-lg">
-                                                <p class="text-sm text-slate-600 font-semibold">Tomadas en Futuro</p>
-                                                <p class="text-3xl font-bold text-slate-500 mt-1">0.0</p>
-                                                <p class="text-xs text-slate-500">Solicitudes aprobadas</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Vacaciones Tomadas -->
-                                    <div class="bg-white p-6 rounded-lg shadow-sm">
-                                        <div class="flex justify-between items-center">
-                                            <h2 class="text-lg font-bold text-slate-800">Historial de Vacaciones Tomadas</h2>
-                                            <button @click="showAddVacationModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                                <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Agregar
-                                            </button>
-                                        </div>
-                                        <div class="mt-4 overflow-x-auto">
-                                            <table class="w-full text-sm">
-                                                <thead class="text-left text-slate-500 bg-slate-50">
-                                                    <tr>
-                                                        <th class="p-3 font-semibold">Inicio</th>
-                                                        <th class="p-3 font-semibold">Término</th>
-                                                        <th class="p-3 font-semibold">Número de Días</th>
-                                                        <th class="p-3 font-semibold">Tipo</th>
-                                                        <th class="p-3 font-semibold">Estado</th>
-                                                        <th class="p-3 font-semibold">Opciones</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3">11-09-2025</td>
-                                                        <td class="p-3">11-09-2025</td>
-                                                        <td class="p-3">1.0</td>
-                                                        <td class="p-3">Legales</td>
-                                                        <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Aprobada</span></td>
-                                                        <td class="p-3">
-                                                            <div class="flex space-x-2 text-slate-500">
-                                                                <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                             <!-- Pestaña: Expediente Digital -->
-                            <div id="documentos" class="content-section">
-                                 <div class="bg-white p-6 rounded-lg shadow-sm">
-                                    <div class="flex justify-between items-center">
-                                        <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="folder-archive" class="w-6 h-6 mr-3 text-blue-600"></i>Expediente Digital</h2>
-                                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                            <i data-lucide="upload" class="w-4 h-4 mr-2"></i>Subir archivo
-                                        </button>
-                                    </div>
-                                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        <template x-for="doc in digitalFile">
-                                            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">
-                                                <div class="flex items-center">
-                                                    <i data-lucide="file-text" class="w-5 h-5 mr-3 text-slate-500"></i>
-                                                    <span class="text-sm font-semibold" x-text="doc.name"></span>
-                                                </div>
-                                                <button class="p-1 text-slate-400 hover:text-blue-600"><i data-lucide="download" class="w-5 h-5"></i></button>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Auditoría -->
-                            <div id="auditoria" class="content-section">
-                                <div class="bg-white p-6 rounded-lg shadow-sm">
-                                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="shield-check" class="w-6 h-6 mr-3 text-blue-600"></i>Registro de Auditoría</h2>
-                                    
-                                    <!-- Filtros -->
-                                    <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div>
-                                                <label for="auditStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
-                                                <input type="date" id="auditStartDate" x-model="auditFilters.startDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                            </div>
-                                            <div>
-                                                <label for="auditEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
-                                                <input type="date" id="auditEndDate" x-model="auditFilters.endDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                            </div>
-                                            <div>
-                                                <label for="auditDescription" class="text-xs font-semibold text-slate-600">Búsqueda por descripción</label>
-                                                <input type="text" id="auditDescription" x-model="auditFilters.description" @input="auditLogPage = 1" placeholder="Buscar en descripción..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-4 overflow-x-auto">
-                                        <table class="w-full text-sm">
-                                            <thead class="text-left text-slate-500 bg-slate-50">
-                                                <tr>
-                                                    <th class="p-3 font-semibold">Descripción</th>
-                                                    <th class="p-3 font-semibold">Nombre usuario</th>
-                                                    <th class="p-3 font-semibold">Rol de usuario</th>
-                                                    <th class="p-3 font-semibold">Fecha</th>
-                                                    <th class="p-3 font-semibold">Hora</th>
-                                                    <th class="p-3 font-semibold">Valor Antes</th>
-                                                    <th class="p-3 font-semibold">Valor Después</th>
-                                                    <th class="p-3 font-semibold">Endpoint</th>
-                                                    <th class="p-3 font-semibold">Ip de ejecución</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <template x-for="log in paginatedAuditLog" :key="log.id">
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3" x-text="log.description"></td>
-                                                        <td class="p-3" x-text="log.user"></td>
-                                                        <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700" x-text="log.role"></span></td>
-                                                        <td class="p-3" x-text="log.date"></td>
-                                                        <td class="p-3" x-text="log.time"></td>
-                                                        <td class="p-3 text-xs" x-text="log.valueBefore || '-'"></td>
-                                                        <td class="p-3 text-xs" x-text="log.valueAfter || '-'"></td>
-                                                        <td class="p-3 font-mono text-xs" x-text="log.endpoint"></td>
-                                                        <td class="p-3 font-mono text-xs" x-text="log.ip"></td>
-                                                    </tr>
-                                                </template>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <!-- Pagination -->
-                                    <div class="mt-4 flex justify-between items-center text-sm">
-                                        <p class="text-slate-500" x-text="`Mostrando ${paginatedAuditLog.length} de ${filteredAuditLog.length} registros`"></p>
-                                        <div class="flex items-center space-x-1">
-                                            <button @click="auditLogPage = Math.max(1, auditLogPage - 1)" :disabled="auditLogPage === 1" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                                            <template x-for="page in totalAuditPages">
-                                                <button @click="auditLogPage = page" :class="{'bg-blue-600 text-white': auditLogPage === page, 'hover:bg-slate-100': auditLogPage !== page}" class="px-3 py-1 rounded-md" x-text="page"></button>
-                                            </template>
-                                            <button @click="auditLogPage = Math.min(totalAuditPages, auditLogPage + 1)" :disabled="auditLogPage === totalAuditPages" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <!-- Policies Modal -->
-            <div x-show="showPoliciesModal" @keydown.escape.window="showPoliciesModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
-                <div @click.outside="showPoliciesModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-3xl">
-                    <div class="p-4 border-b flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-slate-800">Políticas de Vacaciones del Colaborador</h3>
-                        <button @click="showPoliciesModal = false" class="text-slate-500 hover:text-slate-800">&times;</button>
-                    </div>
-                    <div class="p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <div>
-                                <label class="text-sm font-semibold text-slate-600">Periodo</label>
-                                <input type="text" value="1° Quincena, Julio '25" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" disabled>
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold text-slate-600">Ver Tipo de Vacaciones</label>
-                                <select class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                    <option>Legales</option>
-                                </select>
-                            </div>
-                        </div>
-                        <h4 class="font-bold text-slate-700 mb-2">Legal 2023</h4>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead class="text-left text-slate-500 bg-slate-50">
-                                    <tr>
-                                        <th class="p-3 font-semibold">Años de antigüedad</th>
-                                        <th class="p-3 font-semibold">Días de vacaciones</th>
-                                        <th class="p-3 font-semibold">Prima Vacacional</th>
-                                        <th class="p-3 font-semibold">Días de Aguinaldo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="policy in vacationPolicies">
-                                        <tr class="border-t border-slate-200">
-                                            <td class="p-3" x-text="policy.years"></td>
-                                            <td class="p-3" x-text="policy.days"></td>
-                                            <td class="p-3" x-text="policy.prima"></td>
-                                            <td class="p-3" x-text="policy.aguinaldo"></td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+        <!-- Incapacidades Section -->
+        <div id="incapacidades-section" class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <h2 class="text-2xl font-semibold text-white">Listado de Incapacidades</h2>
+                <div class="flex flex-wrap gap-2">
+                     <button id="downloadReportBtn" class="bg-green-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300 shadow-sm flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Descargar Reporte
+                    </button>
+                     <button id="openImportSidebarBtn" class="bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-300 shadow-sm flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Importar
+                    </button>
+                    <button id="openModalBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 shadow-sm flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        Registrar Incapacidad
+                    </button>
                 </div>
             </div>
 
-            <!-- Add Vacation Modal -->
-            <div x-show="showAddVacationModal" @keydown.escape.window="showAddVacationModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
-                <div @click.outside="showAddVacationModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-                    <div class="p-4 border-b flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-slate-800">Tomar Vacaciones</h3>
-                        <button @click="showAddVacationModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
+            <!-- Filters -->
+            <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                    <div class="lg:col-span-2">
+                        <label for="searchInput" class="block text-sm font-medium text-gray-400 mb-1">Búsqueda Rápida</label>
+                        <input type="text" id="searchInput" class="block w-full pl-3 pr-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Nombre, RFC, NSS...">
                     </div>
-                    <div class="p-6">
-                        <!-- Días disponibles -->
-                        <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center">
-                            <i data-lucide="palm-tree" class="w-5 h-5 text-green-600 mr-2"></i>
-                            <span class="text-green-800 font-semibold">11.0 días totales disponibles</span>
-                        </div>
-
-                        <form @submit.prevent="console.log('Guardar vacación')">
-                            <!-- Información de días disponibles -->
-                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
-                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
-                                <span class="text-blue-800 text-sm">Tienes <strong>11.0 días</strong> disponibles.</span>
-                            </div>
-
-                            <!-- Fechas -->
-                            <div class="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de inicio <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newVacation.startDate" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de término <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newVacation.endDate" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                            </div>
-
-                            <!-- Periodo de última vacación -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Periodo de la última vacación <span class="text-red-500">*</span></label>
-                                <input type="text" x-model="newVacation.lastVacationPeriod" class="w-full rounded-md border-slate-300 shadow-sm text-sm" value="15/06/2025 al 21/06/2025" required readonly>
-                            </div>
-
-                            <!-- Checkboxes -->
-                            <div class="mb-4 space-y-3">
-                                <label class="flex items-center">
-                                    <input type="checkbox" x-model="newVacation.hasReplacement" class="rounded border-slate-300 mr-2">
-                                    <span class="text-sm text-slate-700">Asignar reemplazo o suplencia</span>
-                                </label>
-                            </div>
-
-                            <!-- Colaborador suplente -->
-                            <div x-show="newVacation.hasReplacement" class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Colaborador Suplente</label>
-                                <select x-model="newVacation.replacementEmployee" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                    <option value="">Seleccionar colaborador...</option>
-                                    <option value="Victoria Castro Rojas (F1)">Victoria Castro Rojas (F1)</option>
-                                    <option value="Juan Pérez (F2)">Juan Pérez (F2)</option>
-                                    <option value="María García (F3)">María García (F3)</option>
-                                </select>
-                            </div>
-
-                            <!-- Información de días solicitados -->
-                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center" x-show="vacationDays > 0">
-                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
-                                <span class="text-blue-800 text-sm">Estás solicitando <strong x-text="vacationDays"></strong> días laborales de vacaciones</span>
-                            </div>
-
-                            <!-- Comentario -->
-                            <div class="mb-6">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Comentario</label>
-                                <textarea x-model="newVacation.comments" rows="3" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="Agregar comentarios adicionales..."></textarea>
-                            </div>
-
-                            <!-- Botones -->
-                            <div class="flex justify-end space-x-3">
-                                <button type="button" @click="showAddVacationModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
-                                    Cancelar
-                                </button>
-                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
-                                    Guardar
-                                </button>
-                            </div>
-                        </form>
+                    <div>
+                        <label for="filterStartDate" class="block text-sm font-medium text-gray-400 mb-1">Fecha Inicio</label>
+                        <input type="date" id="filterStartDate" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-800 text-white">
                     </div>
+                     <div>
+                        <label for="filterEndDate" class="block text-sm font-medium text-gray-400 mb-1">Fecha Fin</label>
+                        <input type="date" id="filterEndDate" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-800 text-white">
+                    </div>
+                    <div>
+                        <label for="filterTipo" class="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
+                        <select id="filterTipo" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-800 text-white">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filterModo" class="block text-sm font-medium text-gray-400 mb-1">Modo</label>
+                        <select id="filterModo" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-800 text-white">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                     <div>
+                        <label for="filterEstado" class="block text-sm font-medium text-gray-400 mb-1">Estado</label>
+                        <select id="filterEstado" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-800 text-white">
+                            <option value="">Todos</option>
+                            <option value="Activa">Activa</option>
+                            <option value="Terminada">Terminada</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button id="clearFiltersBtn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500 transition">Limpiar</button>
+                    <button id="applyFiltersBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">Aplicar Filtros</button>
                 </div>
             </div>
 
-            <!-- Registrar Inasistencia Modal -->
-            <div x-show="showInasistenciaModal" @keydown.escape.window="showInasistenciaModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
-                <div @click.outside="showInasistenciaModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-                    <div class="p-4 border-b flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-slate-800">Registrar Inasistencia</h3>
-                        <button @click="showInasistenciaModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
-                    </div>
-                    <div class="p-6">
-                        <form @submit.prevent="console.log('Guardar inasistencia')">
-                            <!-- Tipo de Asistencia -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Asistencia <span class="text-red-500">*</span></label>
-                                <select x-model="newInasistencia.tipo" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                    <option value="Inasistencia">Inasistencia</option>
-                                </select>
-                            </div>
-
-                            <!-- Fechas -->
-                            <div class="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Inicio <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newInasistencia.fechaInicio" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Término <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newInasistencia.fechaTermino" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                            </div>
-
-                            <!-- Inicio Fecha Aplicación -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Inicio Fecha Aplicación</label>
-                                <input type="date" x-model="newInasistencia.inicioFechaAplicacion" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                            </div>
-
-                            <!-- Activar Suplencia -->
-                            <div class="mb-4">
-                                <label class="flex items-center">
-                                    <input type="checkbox" x-model="newInasistencia.activarSuplencia" class="rounded border-slate-300 mr-2">
-                                    <span class="text-sm text-slate-700">Activar Suplencia</span>
-                                </label>
-                            </div>
-
-                            <!-- Colaborador Suplente -->
-                            <div x-show="newInasistencia.activarSuplencia" class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Colaborador Suplente</label>
-                                <select x-model="newInasistencia.colaboradorSuplente" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                    <option value="">Seleccionar colaborador...</option>
-                                    <option value="Ana Eugenia Reyes Castellanos (F1)">Ana Eugenia Reyes Castellanos (F1)</option>
-                                    <option value="Victoria Castro Rojas (F1)">Victoria Castro Rojas (F1)</option>
-                                    <option value="Juan Pérez (F2)">Juan Pérez (F2)</option>
-                                    <option value="María García (F3)">María García (F3)</option>
-                                </select>
-                            </div>
-
-                            <!-- Información de días calculados -->
-                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center" x-show="inasistenciaDays > 0">
-                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
-                                <span class="text-blue-800 text-sm">Estás registrando <strong x-text="inasistenciaDays"></strong> días de inasistencia</span>
-                            </div>
-
-                            <!-- Comentario -->
-                            <div class="mb-6">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Comentario</label>
-                                <textarea x-model="newInasistencia.comentario" rows="3" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="No se presentó explicó que tuvo una emergencia familiar."></textarea>
-                            </div>
-
-                            <!-- Botones -->
-                            <div class="flex justify-end space-x-3">
-                                <button type="button" @click="showInasistenciaModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
-                                    Cancelar
-                                </button>
-                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
-                                    Agregar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+            <!-- Lista de Incapacidades -->
+            <div class="overflow-x-auto">
+                <table id="incapacidadesTable" class="min-w-full">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Trabajador (RFC/NSS)</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Folio</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Tipo</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Inicio</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Fin</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Días</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Modo</th>
+                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-white">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+                 <p id="noResults" class="text-center text-gray-500 py-8 hidden">No se encontraron incapacidades que coincidan con los filtros.</p>
+            </div>
+            <!-- Pagination -->
+            <div id="paginationControls" class="flex flex-col md:flex-row justify-between items-center mt-6 text-sm">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <span class="mr-2">Filas por página:</span>
+                    <select id="rowsPerPage" class="p-1 border border-gray-600 rounded-md bg-gray-800 text-white">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                <div id="paginationInfo" class="mb-4 md:mb-0"></div>
+                <div class="flex items-center">
+                    <button id="prevPageBtn" class="bg-gray-600 p-2 rounded-md hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <span id="pageIndicator" class="px-4"></span>
+                    <button id="nextPageBtn" class="bg-gray-600 p-2 rounded-md hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
                 </div>
             </div>
-
-            <!-- Registrar Permiso Modal -->
-            <div x-show="showPermisoModal" @keydown.escape.window="showPermisoModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
-                <div @click.outside="showPermisoModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-                    <div class="p-4 border-b flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-slate-800">Registrar Permisos</h3>
-                        <button @click="showPermisoModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
-                    </div>
-                    <div class="p-6">
-                        <form @submit.prevent="console.log('Guardar permiso')">
-                            <!-- Tipo de Asistencia -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Asistencia <span class="text-red-500">*</span></label>
-                                <select x-model="newPermiso.tipo" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                    <option value="Permiso">Permiso</option>
-                                </select>
-                            </div>
-
-                            <!-- Subtipo de Permiso -->
-                            <div class="mb-4">
-                                <p class="text-sm text-blue-600 font-medium">Permiso sin goce de sueldo</p>
-                            </div>
-
-                            <!-- Fechas -->
-                            <div class="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Inicio <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newPermiso.fechaInicio" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Término <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newPermiso.fechaTermino" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                            </div>
-
-                            <!-- Inicio Fecha Aplicación -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Inicio Fecha Aplicación</label>
-                                <input type="date" x-model="newPermiso.inicioFechaAplicacion" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                            </div>
-
-                            <!-- Activar Suplencia -->
-                            <div class="mb-4">
-                                <label class="flex items-center">
-                                    <input type="checkbox" x-model="newPermiso.activarSuplencia" class="rounded border-slate-300 mr-2">
-                                    <span class="text-sm text-slate-700">Activar Suplencia</span>
-                                </label>
-                            </div>
-
-                            <!-- Colaborador Suplente -->
-                            <div x-show="newPermiso.activarSuplencia" class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Colaborador Suplente</label>
-                                <select x-model="newPermiso.colaboradorSuplente" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                    <option value="">Seleccionar colaborador...</option>
-                                    <option value="Ana Prueba X (F1)">Ana Prueba X (F1)</option>
-                                    <option value="Victoria Castro Rojas (F1)">Victoria Castro Rojas (F1)</option>
-                                    <option value="Juan Pérez (F2)">Juan Pérez (F2)</option>
-                                    <option value="María García (F3)">María García (F3)</option>
-                                </select>
-                            </div>
-
-                            <!-- Información de días calculados -->
-                            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center" x-show="permisoDays > 0">
-                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i>
-                                <span class="text-blue-800 text-sm">Estás registrando <strong x-text="permisoDays"></strong> días de permiso</span>
-                            </div>
-
-                            <!-- Comentario -->
-                            <div class="mb-6">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Comentario</label>
-                                <textarea x-model="newPermiso.comentario" rows="3" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="Permiso de ausencia por festival de su hijo"></textarea>
-                            </div>
-
-                            <!-- Botones -->
-                            <div class="flex justify-end space-x-3">
-                                <button type="button" @click="showPermisoModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
-                                    Cancelar
-                                </button>
-                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
-                                    Agregar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                        </div>
-
-            <!-- Registrar Incapacidad Modal -->
-            <div x-show="showIncapacidadModal" @keydown.escape.window="showIncapacidadModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" x-transition>
-                <div @click.outside="showIncapacidadModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-3xl">
-                    <div class="p-4 border-b flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-slate-800">Registrar Incapacidad</h3>
-                        <button @click="showIncapacidadModal = false" class="text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
-                    </div>
-                    <div class="p-6">
-                        <form @submit.prevent="console.log('Guardar incapacidad')">
-                            <!-- Buscar Trabajador y Número de Incapacidad -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div class="relative">
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Buscar Trabajador <span class="text-red-500">*</span></label>
-                                    <input type="text" 
-                                           x-model="newIncapacidad.trabajadorSearch" 
-                                           @input="newIncapacidad.showTrabajadorDropdown = true"
-                                           @focus="newIncapacidad.showTrabajadorDropdown = true"
-                                           class="w-full rounded-md border-slate-300 shadow-sm text-sm" 
-                                           placeholder="Escribe para buscar..." 
-                                           autocomplete="off" 
-                                           required>
-                                    <input type="hidden" x-model="newIncapacidad.trabajadorId">
-                                    
-                                    <!-- Dropdown de resultados -->
-                                    <div x-show="newIncapacidad.showTrabajadorDropdown && filteredTrabajadores.length > 0" 
-                                         @click.outside="newIncapacidad.showTrabajadorDropdown = false"
-                                         class="absolute z-10 w-full bg-white border border-slate-300 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
-                                        <template x-for="trabajador in filteredTrabajadores" :key="trabajador.id">
-                                            <div @click="selectTrabajador(trabajador)" 
-                                                 class="px-4 py-3 hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0">
-                                                <div class="font-medium text-slate-800" x-text="trabajador.nombre"></div>
-                                                <div class="text-sm text-slate-500">
-                                                    <span x-text="trabajador.puesto"></span> • <span x-text="trabajador.departamento"></span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    
-                                    <!-- Mensaje cuando no hay resultados -->
-                                    <div x-show="newIncapacidad.showTrabajadorDropdown && newIncapacidad.trabajadorSearch.length >= 2 && filteredTrabajadores.length === 0"
-                                         class="absolute z-10 w-full bg-white border border-slate-300 rounded-md mt-1 shadow-lg">
-                                        <div class="px-4 py-3 text-slate-500 text-sm">
-                                            No se encontraron trabajadores
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Número de Incapacidad (Folio) <span class="text-red-500">*</span></label>
-                                    <input type="text" x-model="newIncapacidad.numeroIncapacidad" class="w-full rounded-md border-slate-300 shadow-sm text-sm" placeholder="Ej: AB123456" pattern="[A-Za-z]{2}[0-9]{6}" required>
-                                    <p class="text-red-500 text-xs mt-1">Formato: 2 letras y 6 números</p>
-                                </div>
-                            </div>
-
-                            <!-- Tipo de Incapacidad y Subtipo -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Incapacidad IMSS <span class="text-red-500">*</span></label>
-                                    <select x-model="newIncapacidad.tipoIncapacidad" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                        <option value="Enfermedad General">Enfermedad General</option>
-                                        <option value="Maternidad">Maternidad</option>
-                                        <option value="Riesgo de Trabajo">Riesgo de Trabajo</option>
-                                    </select>
-                                </div>
-                                <div x-show="newIncapacidad.tipoIncapacidad === 'Riesgo de Trabajo'">
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Subtipo de Riesgo <span class="text-red-500">*</span></label>
-                                    <select x-model="newIncapacidad.subtipoRiesgo" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                        <option value="Accidente de Trabajo">Accidente de Trabajo</option>
-                                        <option value="Accidente en Trayecto">Accidente en Trayecto</option>
-                                        <option value="Enfermedad de Trabajo">Enfermedad de Trabajo</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Fechas y Días -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de Inicio <span class="text-red-500">*</span></label>
-                                    <input type="date" x-model="newIncapacidad.fechaInicio" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Días <span class="text-red-500">*</span></label>
-                                    <input type="number" x-model="newIncapacidad.diasIncapacidad" min="1" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de Término</label>
-                                    <input type="date" :value="calculatedEndDate" class="w-full rounded-md border-slate-300 shadow-sm text-sm bg-slate-100" readonly>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Expedición</label>
-                                    <input type="date" x-model="newIncapacidad.fechaExpedicion" class="w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                </div>
-                            </div>
-
-                            <!-- Modo de Incapacidad -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Modo de Incapacidad <span class="text-red-500">*</span></label>
-                                <select x-model="newIncapacidad.modoIncapacidad" class="w-full rounded-md border-slate-300 shadow-sm text-sm" required>
-                                    <option value="Inicial">Inicial</option>
-                                    <option value="Subsecuente">Subsecuente</option>
-                                    <option value="Unica">Única</option>
-                                </select>
-                            </div>
-
-                            <!-- Advertencia de Nómina (condicional) -->
-                            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center" x-show="false">
-                                <i data-lucide="alert-triangle" class="w-5 h-5 text-yellow-600 mr-2"></i>
-                                <div>
-                                    <span class="font-medium text-yellow-800">¡Advertencia!</span>
-                                    <div class="text-yellow-700 text-sm mt-1">
-                                        El rango de fechas se cruza con un periodo de nómina ya autorizado.
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Botones -->
-                            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200">
-                                <button type="button" @click="showIncapacidadModal = false" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
-                                    Cancelar
-                                </button>
-                                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
-                                    Guardar Incapacidad
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
+
+    <!-- Modal de Registro -->
+    <div id="incapacidadModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 modal-backdrop opacity-0 pointer-events-none">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl modal-content transform scale-95">
+            <div class="flex justify-between items-center p-5 border-b border-gray-700">
+                <h3 class="text-xl font-semibold text-white">Registrar Incapacidad</h3>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="incapacidadForm" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="relative">
+                        <label for="trabajadorSearch" class="block text-sm font-medium text-gray-400 mb-1">Buscar Trabajador*</label>
+                        <input type="text" id="trabajadorSearch" name="trabajadorSearch" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900 text-white" placeholder="Escribe para buscar..." autocomplete="off" required>
+                        <input type="hidden" id="trabajadorId" name="trabajadorId">
+                        <div id="trabajadorSearchResults" class="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-md mt-1 hidden search-results"></div>
+                    </div>
+                    <div>
+                        <label for="numeroIncapacidad" class="block text-sm font-medium text-gray-400 mb-1">Número de Incapacidad (Folio)*</label>
+                        <input type="text" id="numeroIncapacidad" name="numeroIncapacidad" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900" placeholder="Ej: AB123456" pattern="[A-Za-z]{2}[0-9]{6}" required>
+                         <p id="folioError" class="text-red-500 text-xs mt-1 hidden">Formato incorrecto. Deben ser 2 letras y 6 números.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="tipoIncapacidad" class="block text-sm font-medium text-gray-400 mb-1">Tipo de Incapacidad IMSS*</label>
+                        <select id="tipoIncapacidad" name="tipoIncapacidad" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900">
+                            <option value="Enfermedad General">Enfermedad General</option>
+                            <option value="Maternidad">Maternidad</option>
+                            <option value="Riesgo de Trabajo">Riesgo de Trabajo</option>
+                        </select>
+                    </div>
+                    <div id="subtipoContainer" class="hidden">
+                        <label for="subtipoRiesgo" class="block text-sm font-medium text-gray-400 mb-1">Subtipo de Riesgo*</label>
+                        <select id="subtipoRiesgo" name="subtipoRiesgo" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900">
+                            <option value="Accidente de Trabajo">Accidente de Trabajo</option>
+                            <option value="Accidente en Trayecto">Accidente en Trayecto</option>
+                            <option value="Enfermedad de Trabajo">Enfermedad de Trabajo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label for="fechaInicio" class="block text-sm font-medium text-gray-400 mb-1">Fecha de Inicio*</label>
+                        <input type="date" id="fechaInicio" name="fechaInicio" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900" required>
+                    </div>
+                    <div>
+                        <label for="diasIncapacidad" class="block text-sm font-medium text-gray-400 mb-1">Días*</label>
+                        <input type="number" id="diasIncapacidad" name="diasIncapacidad" min="1" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900" required>
+                    </div>
+                    <div>
+                        <label for="fechaTermino" class="block text-sm font-medium text-gray-400 mb-1">Fecha de Término</label>
+                        <input type="date" id="fechaTermino" name="fechaTermino" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-700" readonly>
+                    </div>
+                    <div>
+                        <label for="fechaExpedicion" class="block text-sm font-medium text-gray-400 mb-1">Fecha Expedición</label>
+                        <input type="date" id="fechaExpedicion" name="fechaExpedicion" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900">
+                    </div>
+                </div>
+                <div>
+                    <label for="modoIncapacidad" class="block text-sm font-medium text-gray-400 mb-1">Modo de Incapacidad*</label>
+                    <select id="modoIncapacidad" name="modoIncapacidad" class="w-full p-2 border border-gray-600 rounded-md shadow-sm bg-gray-900" required>
+                        <option value="Inicial">Inicial</option>
+                        <option value="Subsecuente">Subsecuente</option>
+                        <option value="Unica">Única</option>
+                    </select>
+                    <p id="modoError" class="text-red-500 text-xs mt-1 hidden error-message"></p>
+                </div>
+
+                <!-- Payroll Overlap Warning -->
+                <div id="payrollWarning" class="hidden p-3 text-sm text-yellow-300 bg-yellow-900/50 rounded-lg" role="alert">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                        <span class="font-medium">¡Advertencia!</span>
+                    </div>
+                    <div class="mt-1 ml-7 text-yellow-400">
+                        El rango de fechas se cruza con un periodo de nómina ya autorizado.
+                    </div>
+                </div>
+
+                <div class="flex justify-end items-center pt-4 border-t border-gray-700">
+                    <button type="button" id="cancelBtn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500 transition mr-2">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">Guardar Incapacidad</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sidebar de Importación -->
+    <div id="importSidebar" class="fixed inset-0 z-40 sidebar-backdrop opacity-0 pointer-events-none">
+        <div id="sidebarContent" class="fixed top-0 right-0 h-full w-full max-w-md bg-gray-800 border-l border-gray-700 shadow-2xl sidebar-content transform translate-x-full">
+            <div class="flex flex-col h-full">
+                <div class="flex justify-between items-center p-5 border-b border-gray-700">
+                    <h3 class="text-xl font-semibold text-white">Carga masiva de incidencias</h3>
+                    <button id="closeImportSidebarBtn" class="text-gray-400 hover:text-white">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-6 flex-grow">
+                    <div>
+                        <h4 class="text-lg font-medium text-white">1.- Descarga el template</h4>
+                        <p class="text-gray-400 text-sm mb-2">Descarga el template para llenar los datos de las incidencias.</p>
+                        <button class="w-full bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition">Descargar template</button>
+                    </div>
+                     <div>
+                        <h4 class="text-lg font-medium text-white">2.- Sube el archivo</h4>
+                        <p class="text-gray-400 text-sm mb-2">Sube el archivo con los datos de las incidencias.</p>
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-600 border-dashed rounded-md">
+                            <div class="space-y-1 text-center">
+                                <svg class="mx-auto h-12 w-12 text-gray-500" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <div class="flex text-sm text-gray-400">
+                                    <label for="file-upload" class="relative cursor-pointer bg-gray-800 rounded-md font-medium text-blue-400 hover:text-blue-500 focus-within:outline-none">
+                                        <span>Subir archivo</span>
+                                        <input id="file-upload" name="file-upload" type="file" class="sr-only">
+                                    </label>
+                                    <p class="pl-1">o arrástralo aquí</p>
+                                </div>
+                                <p class="text-xs text-gray-500">XLS, XLSX hasta 10MB</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 border-t border-gray-700">
+                    <button class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA MOCK ---
+            const trabajadores = [
+                { id: 1, nombre: 'María Pérez', rfc: 'PEPM900101ABC', nss: '12345678901' },
+                { id: 2, nombre: 'Juan Rodríguez', rfc: 'RODJ850202DEF', nss: '09876543211' },
+                { id: 3, nombre: 'Ana García', rfc: 'GAMA880303GHI', nss: '11223344551' },
+                { id: 4, nombre: 'Carlos Sánchez', rfc: 'SACJ920404JKL', nss: '22334455661' },
+                { id: 5, nombre: 'Laura Martínez', rfc: 'MALF950505MNO', nss: '33445566771' },
+                { id: 6, nombre: 'Pedro Gómez', rfc: 'GOGP800606PQR', nss: '44556677881' },
+                { id: 7, nombre: 'Sofía Hernández', rfc: 'HESJ980707STU', nss: '55667788991' },
+                { id: 8, nombre: 'Luis Torres', rfc: 'TOLJ750808VWX', nss: '66778899001' },
+                { id: 9, nombre: 'Gabriela Díaz', rfc: 'DIAG890909YZA', nss: '77889900111' },
+                { id: 10, nombre: 'Jorge Ramírez', rfc: 'RAJG911010BCD', nss: '88990011221' },
+                { id: 11, nombre: 'Fernanda Cruz', rfc: 'CRUF931111EFG', nss: '99001122331' }
+            ];
+
+            let incapacidades = [
+                { id: 1, trabajadorId: 1, trabajadorNombre: 'María Pérez', rfc: 'PEPM900101ABC', nss: '12345678901', folio: 'IF250710', tipo: 'Enfermedad General', subtipo: null, fechaInicio: '2025-07-10', dias: 5, fechaTermino: '2025-07-14', modo: 'Inicial' },
+                { id: 2, trabajadorId: 1, trabajadorNombre: 'María Pérez', rfc: 'PEPM900101ABC', nss: '12345678901', folio: 'IF250715', tipo: 'Enfermedad General', subtipo: null, fechaInicio: '2025-07-15', dias: 3, fechaTermino: '2025-07-17', modo: 'Subsecuente' },
+                { id: 3, trabajadorId: 2, trabajadorNombre: 'Juan Rodríguez', rfc: 'RODJ850202DEF', nss: '09876543211', folio: 'GE250707', tipo: 'Enfermedad General', subtipo: null, fechaInicio: '2025-07-07', dias: 3, fechaTermino: '2025-07-09', modo: 'Unica' },
+                { id: 4, trabajadorId: 3, trabajadorNombre: 'Ana García', rfc: 'GAMA880303GHI', nss: '11223344551', folio: 'MA250601', tipo: 'Maternidad', subtipo: null, fechaInicio: '2025-06-01', dias: 84, fechaTermino: '2025-08-23', modo: 'Unica' },
+                { id: 5, trabajadorId: 2, trabajadorNombre: 'Juan Rodríguez', rfc: 'RODJ850202DEF', nss: '09876543211', folio: 'RT250520', tipo: 'Riesgo de Trabajo', subtipo: 'Accidente de Trabajo', fechaInicio: '2025-05-20', dias: 10, fechaTermino: '2025-05-29', modo: 'Inicial' },
+                ...Array.from({ length: 15 }, (_, i) => ({
+                    id: 6 + i,
+                    trabajadorId: (i % 11) + 1,
+                    trabajadorNombre: trabajadores[i % 11].nombre,
+                    rfc: trabajadores[i % 11].rfc,
+                    nss: trabajadores[i % 11].nss,
+                    folio: `EG${250401 + i}`,
+                    tipo: 'Enfermedad General',
+                    subtipo: null,
+                    fechaInicio: `2025-04-${(i % 28) + 1}`,
+                    dias: (i % 5) + 1,
+                    fechaTermino: `2025-04-${(i % 28) + 1 + (i % 5)}`,
+                    modo: 'Inicial'
+                }))
+            ];
+            
+            const periodosAutorizados = [
+                { start: '2025-07-01', end: '2025-07-07' }
+            ];
+
+            // --- STATE ---
+            let currentPage = 1;
+            let rowsPerPage = 10;
+            let filteredIncapacidades = [];
+
+            // --- UI ELEMENTS ---
+            const openModalBtn = document.getElementById('openModalBtn');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const modal = document.getElementById('incapacidadModal');
+            const form = document.getElementById('incapacidadForm');
+            const tableBody = document.getElementById('incapacidadesTable').querySelector('tbody');
+            const trabajadorSearchInput = document.getElementById('trabajadorSearch');
+            const trabajadorIdInput = document.getElementById('trabajadorId');
+            const trabajadorSearchResults = document.getElementById('trabajadorSearchResults');
+            const tipoIncapacidadSelect = document.getElementById('tipoIncapacidad');
+            const subtipoContainer = document.getElementById('subtipoContainer');
+            const fechaInicioInput = document.getElementById('fechaInicio');
+            const diasInput = document.getElementById('diasIncapacidad');
+            const fechaTerminoInput = document.getElementById('fechaTermino');
+            const folioInput = document.getElementById('numeroIncapacidad');
+            const folioError = document.getElementById('folioError');
+            const modoSelect = document.getElementById('modoIncapacidad');
+            const modoError = document.getElementById('modoError');
+            const payrollWarning = document.getElementById('payrollWarning');
+            const noResultsP = document.getElementById('noResults');
+            const downloadReportBtn = document.getElementById('downloadReportBtn');
+
+            // Filter elements
+            const searchInput = document.getElementById('searchInput');
+            const filterStartDate = document.getElementById('filterStartDate');
+            const filterEndDate = document.getElementById('filterEndDate');
+            const filterTipo = document.getElementById('filterTipo');
+            const filterModo = document.getElementById('filterModo');
+            const filterEstado = document.getElementById('filterEstado');
+            const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+            const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+
+            // Pagination elements
+            const paginationControls = document.getElementById('paginationControls');
+            const rowsPerPageSelect = document.getElementById('rowsPerPage');
+            const paginationInfo = document.getElementById('paginationInfo');
+            const pageIndicator = document.getElementById('pageIndicator');
+            const prevPageBtn = document.getElementById('prevPageBtn');
+            const nextPageBtn = document.getElementById('nextPageBtn');
+
+            // Import Sidebar elements
+            const openImportSidebarBtn = document.getElementById('openImportSidebarBtn');
+            const closeImportSidebarBtn = document.getElementById('closeImportSidebarBtn');
+            const importSidebar = document.getElementById('importSidebar');
+            const sidebarContent = document.getElementById('sidebarContent');
+
+            // --- FUNCTIONS ---
+            const toggleModal = (show) => {
+                if (show) {
+                    modal.classList.remove('opacity-0', 'pointer-events-none');
+                    modal.querySelector('.modal-content').classList.remove('scale-95');
+                } else {
+                    modal.classList.add('opacity-0');
+                    setTimeout(() => {
+                        modal.classList.add('pointer-events-none');
+                        modal.querySelector('.modal-content').classList.add('scale-95');
+                    }, 300);
+                }
+            };
+            
+            const toggleSidebar = (show) => {
+                if (show) {
+                    importSidebar.classList.remove('opacity-0', 'pointer-events-none');
+                    sidebarContent.classList.remove('translate-x-full');
+                } else {
+                    sidebarContent.classList.add('translate-x-full');
+                    setTimeout(() => {
+                        importSidebar.classList.add('opacity-0', 'pointer-events-none');
+                    }, 300);
+                }
+            };
+
+            const formatDate = (dateString, separator = '/') => {
+                if (!dateString) return '';
+                const date = new Date(dateString + 'T00:00:00');
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return [day, month, year].join(separator);
+            };
+
+            const applyFiltersAndRender = () => {
+                const filters = {
+                    search: searchInput.value.toLowerCase().trim(),
+                    startDate: filterStartDate.value,
+                    endDate: filterEndDate.value,
+                    tipo: filterTipo.value,
+                    modo: filterModo.value,
+                    estado: filterEstado.value
+                };
+
+                filteredIncapacidades = incapacidades.filter(inc => {
+                    const searchMatch = filters.search === '' ||
+                        inc.trabajadorNombre.toLowerCase().includes(filters.search) ||
+                        inc.rfc.toLowerCase().includes(filters.search) ||
+                        inc.nss.toLowerCase().includes(filters.search);
+                    const incDate = new Date(inc.fechaInicio);
+                    const startDateMatch = !filters.startDate || incDate >= new Date(filters.startDate);
+                    const endDateMatch = !filters.endDate || incDate <= new Date(filters.endDate);
+                    const tipoMatch = !filters.tipo || inc.tipo === filters.tipo;
+                    const modoMatch = !filters.modo || inc.modo === filters.modo;
+                    const hoy = new Date();
+                    const fin = new Date(inc.fechaTermino + 'T23:59:59');
+                    const estadoActual = hoy <= fin ? 'Activa' : 'Terminada';
+                    const estadoMatch = !filters.estado || estadoActual === filters.estado;
+                    return searchMatch && startDateMatch && endDateMatch && tipoMatch && modoMatch && estadoMatch;
+                }).sort((a, b) => new Date(b.fechaInicio) - new Date(a.fechaInicio));
+                
+                currentPage = 1;
+                renderPage();
+            };
+
+            const renderPage = () => {
+                tableBody.innerHTML = '';
+                noResultsP.classList.toggle('hidden', filteredIncapacidades.length > 0);
+                paginationControls.classList.toggle('hidden', filteredIncapacidades.length === 0);
+
+                if (filteredIncapacidades.length === 0) return;
+
+                const startIndex = (currentPage - 1) * rowsPerPage;
+                const endIndex = startIndex + rowsPerPage;
+                const pageItems = filteredIncapacidades.slice(startIndex, endIndex);
+
+                pageItems.forEach(inc => {
+                    const hoy = new Date();
+                    const fin = new Date(inc.fechaTermino + 'T23:59:59');
+                    const estado = hoy <= fin ?
+                        '<span class="bg-green-900 text-green-300 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full">Activa</span>' :
+                        '<span class="bg-red-900 text-red-300 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full">Terminada</span>';
+
+                    const row = `
+                        <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+                            <td class="py-3 px-4">
+                                <div class="font-medium text-white">${inc.trabajadorNombre}</div>
+                                <div class="text-xs text-gray-400">${inc.rfc} / ${inc.nss}</div>
+                            </td>
+                            <td class="py-3 px-4 font-mono">${inc.folio}</td>
+                            <td class="py-3 px-4">${inc.subtipo ? `${inc.tipo} (${inc.subtipo})` : inc.tipo}</td>
+                            <td class="py-3 px-4">${formatDate(inc.fechaInicio)}</td>
+                            <td class="py-3 px-4">${formatDate(inc.fechaTermino)}</td>
+                            <td class="py-3 px-4 text-center">${inc.dias}</td>
+                            <td class="py-3 px-4">${inc.modo}</td>
+                            <td class="py-3 px-4">${estado}</td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+                renderPaginationControls();
+            };
+
+            const renderPaginationControls = () => {
+                const totalItems = filteredIncapacidades.length;
+                const totalPages = Math.ceil(totalItems / rowsPerPage);
+                
+                const startItem = totalItems > 0 ? (currentPage - 1) * rowsPerPage + 1 : 0;
+                const endItem = Math.min(currentPage * rowsPerPage, totalItems);
+
+                paginationInfo.textContent = `Mostrando ${startItem}-${endItem} de ${totalItems} registros`;
+                pageIndicator.textContent = `Página ${currentPage} de ${totalPages}`;
+
+                prevPageBtn.disabled = currentPage === 1;
+                nextPageBtn.disabled = currentPage === totalPages;
+            };
+            
+            const populateSelects = () => {
+                const tipos = [...new Set(incapacidades.map(i => i.tipo))];
+                tipos.forEach(t => filterTipo.innerHTML += `<option value="${t}">${t}</option>`);
+                const modos = [...new Set(incapacidades.map(i => i.modo))];
+                modos.forEach(m => filterModo.innerHTML += `<option value="${m}">${m}</option>`);
+            };
+
+            const calcularFechaTermino = () => {
+                const fechaInicio = fechaInicioInput.value;
+                const dias = parseInt(diasInput.value, 10);
+                if (fechaInicio && dias > 0) {
+                    const fecha = new Date(fechaInicio + 'T00:00:00');
+                    fecha.setDate(fecha.getDate() + dias - 1);
+                    fechaTerminoInput.value = fecha.toISOString().split('T')[0];
+                } else {
+                    fechaTerminoInput.value = '';
+                }
+                validatePayrollOverlap();
+            };
+            
+            const validatePayrollOverlap = () => {
+                const newStartStr = fechaInicioInput.value;
+                const newEndStr = fechaTerminoInput.value;
+
+                if (!newStartStr || !newEndStr) {
+                    payrollWarning.classList.add('hidden');
+                    return;
+                }
+
+                const newStart = new Date(newStartStr);
+                const newEnd = new Date(newEndStr);
+
+                const hasOverlap = periodosAutorizados.some(periodo => {
+                    const authStart = new Date(periodo.start);
+                    const authEnd = new Date(periodo.end);
+                    return newStart <= authEnd && newEnd >= authStart;
+                });
+
+                payrollWarning.classList.toggle('hidden', !hasOverlap);
+            };
+            
+            const validarModo = () => {
+                const trabajadorId = parseInt(trabajadorIdInput.value, 10);
+                const modo = modoSelect.value;
+                const fechaInicioNuevaStr = fechaInicioInput.value;
+                modoError.classList.add('hidden');
+                if (modo !== 'Subsecuente' || !trabajadorId || !fechaInicioNuevaStr) return true;
+                const incapacidadesTrabajador = incapacidades.filter(i => i.trabajadorId === trabajadorId).sort((a, b) => new Date(b.fechaTermino) - new Date(a.fechaTermino));
+                if (incapacidadesTrabajador.length === 0) {
+                     modoError.textContent = 'Error: No existe una incapacidad inicial para este trabajador.';
+                     modoError.classList.remove('hidden');
+                     return false;
+                }
+                const ultimaIncapacidad = incapacidadesTrabajador[0];
+                if (ultimaIncapacidad.modo === 'Unica') {
+                    modoError.textContent = `Error: La última incapacidad (${ultimaIncapacidad.folio}) fue 'Única'.`;
+                    modoError.classList.remove('hidden');
+                    return false;
+                }
+                const fechaTerminoAnterior = new Date(ultimaIncapacidad.fechaTermino + 'T00:00:00');
+                const fechaSiguienteEsperada = new Date(fechaTerminoAnterior);
+                fechaSiguienteEsperada.setDate(fechaSiguienteEsperada.getDate() + 1);
+                const fechaInicioNueva = new Date(fechaInicioNuevaStr + 'T00:00:00');
+                if (fechaInicioNueva.getTime() !== fechaSiguienteEsperada.getTime()) {
+                    modoError.textContent = `Error: La fecha de inicio debe ser ${formatDate(fechaSiguienteEsperada.toISOString().split('T')[0])}.`;
+                    modoError.classList.remove('hidden');
+                    return false;
+                }
+                return true;
+            };
+
+            const downloadSUAReport = () => {
+                if (filteredIncapacidades.length === 0) {
+                    alert('No hay datos para exportar. Por favor, ajuste los filtros.');
+                    return;
+                }
+
+                const headers = [
+                    'NSS',
+                    'Folio',
+                    'TipoIncapacidad',
+                    'Dias',
+                    'FechaInicio'
+                ];
+
+                // SUA Tipo Incapacidad codes (example)
+                const tipoSUACodes = {
+                    'Enfermedad General': '1',
+                    'Riesgo de Trabajo': '2',
+                    'Maternidad': '3'
+                };
+
+                const csvContent = [
+                    headers.join(','),
+                    ...filteredIncapacidades.map(inc => [
+                        inc.nss,
+                        inc.folio,
+                        tipoSUACodes[inc.tipo] || '0', // Default a 0 si no se encuentra
+                        inc.dias,
+                        formatDate(inc.fechaInicio)
+                    ].join(','))
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', 'Reporte_SUA_Incapacidades.csv');
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            };
+
+            // --- EVENT LISTENERS ---
+            openModalBtn.addEventListener('click', () => {
+                form.reset();
+                trabajadorIdInput.value = '';
+                payrollWarning.classList.add('hidden');
+                modoError.classList.add('hidden');
+                folioError.classList.add('hidden');
+                toggleModal(true);
+            });
+            closeModalBtn.addEventListener('click', () => toggleModal(false));
+            cancelBtn.addEventListener('click', () => toggleModal(false));
+            modal.addEventListener('click', (e) => e.target === modal && toggleModal(false));
+
+            openImportSidebarBtn.addEventListener('click', () => toggleSidebar(true));
+            closeImportSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+            importSidebar.addEventListener('click', (e) => e.target === importSidebar && toggleSidebar(false));
+
+            downloadReportBtn.addEventListener('click', downloadSUAReport);
+
+            applyFiltersBtn.addEventListener('click', applyFiltersAndRender);
+            clearFiltersBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                filterStartDate.value = '';
+                filterEndDate.value = '';
+                filterTipo.value = '';
+                filterModo.value = '';
+                filterEstado.value = '';
+                applyFiltersAndRender();
+            });
+
+            rowsPerPageSelect.addEventListener('change', (e) => {
+                rowsPerPage = parseInt(e.target.value, 10);
+                currentPage = 1;
+                renderPage();
+            });
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderPage();
+                }
+            });
+            nextPageBtn.addEventListener('click', () => {
+                const totalPages = Math.ceil(filteredIncapacidades.length / rowsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderPage();
+                }
+            });
+
+            trabajadorSearchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                if (searchTerm.length < 2) {
+                    trabajadorSearchResults.classList.add('hidden');
+                    return;
+                }
+                const results = trabajadores.filter(t => 
+                    t.nombre.toLowerCase().includes(searchTerm) ||
+                    t.rfc.toLowerCase().includes(searchTerm) ||
+                    t.nss.includes(searchTerm)
+                );
+                trabajadorSearchResults.innerHTML = '';
+                if(results.length > 0) {
+                    results.forEach(t => {
+                        const div = document.createElement('div');
+                        div.className = 'p-2 hover:bg-gray-600 cursor-pointer';
+                        div.textContent = `${t.nombre} (${t.rfc})`;
+                        div.dataset.id = t.id;
+                        div.dataset.nombre = t.nombre;
+                        trabajadorSearchResults.appendChild(div);
+                    });
+                    trabajadorSearchResults.classList.remove('hidden');
+                } else {
+                    trabajadorSearchResults.classList.add('hidden');
+                }
+            });
+
+            trabajadorSearchResults.addEventListener('click', (e) => {
+                if(e.target.dataset.id) {
+                    trabajadorIdInput.value = e.target.dataset.id;
+                    trabajadorSearchInput.value = e.target.dataset.nombre;
+                    trabajadorSearchResults.classList.add('hidden');
+                    validarModo();
+                }
+            });
+
+            tipoIncapacidadSelect.addEventListener('change', (e) => {
+                subtipoContainer.classList.toggle('hidden', e.target.value !== 'Riesgo de Trabajo');
+            });
+
+            [fechaInicioInput, diasInput].forEach(el => el.addEventListener('input', calcularFechaTermino));
+            folioInput.addEventListener('input', () => folioError.classList.toggle('hidden', folioInput.checkValidity()));
+            [modoSelect, fechaInicioInput].forEach(el => el.addEventListener('change', validarModo));
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (!trabajadorIdInput.value) {
+                    alert('Por favor, seleccione un trabajador de la lista.');
+                    return;
+                }
+                if (!folioInput.checkValidity() || !validarModo()) return;
+                const formData = new FormData(form);
+                const trabajadorId = parseInt(formData.get('trabajadorId'), 10);
+                const trabajador = trabajadores.find(t => t.id === trabajadorId);
+                const nuevaIncapacidad = {
+                    id: incapacidades.length + 1,
+                    trabajadorId,
+                    trabajadorNombre: trabajador.nombre,
+                    rfc: trabajador.rfc,
+                    nss: trabajador.nss,
+                    folio: formData.get('numeroIncapacidad').toUpperCase(),
+                    tipo: formData.get('tipoIncapacidad'),
+                    subtipo: formData.get('tipoIncapacidad') === 'Riesgo de Trabajo' ? formData.get('subtipoRiesgo') : null,
+                    fechaInicio: formData.get('fechaInicio'),
+                    dias: parseInt(formData.get('diasIncapacidad'), 10),
+                    fechaTermino: formData.get('fechaTermino'),
+                    modo: formData.get('modoIncapacidad')
+                };
+                incapacidades.push(nuevaIncapacidad);
+                applyFiltersAndRender();
+                toggleModal(false);
+            });
+
+            // --- INITIALIZATION ---
+            populateSelects();
+            applyFiltersAndRender();
+        });
+    </script>
 </body>
 </html>
