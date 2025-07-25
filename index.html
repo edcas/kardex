@@ -328,11 +328,51 @@
                     }
                 ],
                 payrollHistory: [
-                    { id: 1, period: '1ra Quincena Julio 2025', payDate: '15/07/2025', netAmount: '$8,580.50', status: 'Timbrado' },
-                    { id: 2, period: '2da Quincena Junio 2025', payDate: '30/06/2025', netAmount: '$8,550.00', status: 'Timbrado' },
-                    { id: 3, period: '1ra Quincena Junio 2025', payDate: '15/06/2025', netAmount: '$8,550.00', status: 'Timbrado' },
-                    { id: 4, period: '2da Quincena Mayo 2025', payDate: '31/05/2025', netAmount: '$0.00', status: 'Cancelado' },
-                    { id: 5, period: '1ra Quincena Mayo 2025', payDate: '15/05/2025', netAmount: '$8,550.00', status: 'Timbrado' },
+                    { 
+                        id: 1, 
+                        period: '1ra Quincena Julio 2025', 
+                        payDate: '15/07/2025', 
+                        netAmount: '$8,580.50', 
+                        status: 'Timbrado',
+                        percepciones: '$9,125.75',
+                        deducciones: '$1,545.25'
+                    },
+                    { 
+                        id: 2, 
+                        period: '2da Quincena Junio 2025', 
+                        payDate: '30/06/2025', 
+                        netAmount: '$8,550.00', 
+                        status: 'Timbrado',
+                        percepciones: '$9,085.50',
+                        deducciones: '$1,535.50'
+                    },
+                    { 
+                        id: 3, 
+                        period: '1ra Quincena Junio 2025', 
+                        payDate: '15/06/2025', 
+                        netAmount: '$8,550.00', 
+                        status: 'Timbrado',
+                        percepciones: '$9,085.50',
+                        deducciones: '$1,535.50'
+                    },
+                    { 
+                        id: 4, 
+                        period: '2da Quincena Mayo 2025', 
+                        payDate: '31/05/2025', 
+                        netAmount: '$0.00', 
+                        status: 'Cancelado',
+                        percepciones: '$8,950.00',
+                        deducciones: '$8,950.00'
+                    },
+                    { 
+                        id: 5, 
+                        period: '1ra Quincena Mayo 2025', 
+                        payDate: '15/05/2025', 
+                        netAmount: '$8,550.00', 
+                        status: 'Timbrado',
+                        percepciones: '$9,085.50',
+                        deducciones: '$1,535.50'
+                    },
                 ],
                 digitalFile: [
                     { id: 1, name: 'Contrato de Trabajo.pdf' },
@@ -791,7 +831,9 @@
                                             <tbody>
                                                 <template x-for="receipt in filteredPayrollHistory" :key="receipt.id">
                                                     <tr class="border-t border-slate-200">
-                                                        <td class="p-3 text-center"><input type="checkbox" :value="receipt.id" x-model="selectedReceipts" class="rounded border-slate-300"></td>
+                                                        <td class="p-3 text-center">
+                                                            <input type="checkbox" :value="receipt.id" x-model="selectedReceipts" class="rounded border-slate-300">
+                                                        </td>
                                                         <td class="p-3" x-text="receipt.period"></td>
                                                         <td class="p-3" x-text="receipt.payDate"></td>
                                                         <td class="p-3">
