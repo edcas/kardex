@@ -21,6 +21,7 @@
                 showFullInfo: false,
                 activeProfileTab: 'datos-personales',
                 activeAuditTab: 'historico',
+                creditFilter: 'todos',
                 expandedEventId: null,
                 selectedReceipts: [],
                 showPoliciesModal: false,
@@ -89,6 +90,12 @@
                     startDate: '',
                     endDate: ''
                 },
+                eventosFilters: {
+                    startDate: '',
+                    endDate: ''
+                },
+                eventosPage: 1,
+                eventosItemsPerPage: 10,
 
                 // --- COMPUTED ---
                 get filteredPayrollHistory() {
@@ -225,6 +232,53 @@
                         return usuarioMatch && itemDate >= startDate && itemDate <= endDate;
                     });
                 },
+                get filteredCreditos() {
+                    if (!this.creditosData) return [];
+                    if (this.creditFilter === 'todos') return this.creditosData;
+                    return this.creditosData.filter(credito => credito.tipo === this.creditFilter);
+                },
+                get filteredEventosCreditos() {
+                    if (!this.eventosCreditos) return [];
+                    let filtered = this.eventosCreditos;
+                    
+                    // Filtro por categoría
+                    if (this.creditFilter !== 'todos') {
+                        filtered = filtered.filter(evento => evento.categoria === this.creditFilter);
+                    }
+                    
+                    // Filtro por fechas
+                    if (this.eventosFilters.startDate || this.eventosFilters.endDate) {
+                        filtered = filtered.filter(evento => {
+                            if (!this.eventosFilters.startDate && !this.eventosFilters.endDate) return true;
+                            
+                            const eventoDate = new Date(evento.fecha);
+                            
+                            if (this.eventosFilters.startDate && this.eventosFilters.endDate) {
+                                const startDate = new Date(this.eventosFilters.startDate);
+                                const endDate = new Date(this.eventosFilters.endDate);
+                                return eventoDate >= startDate && eventoDate <= endDate;
+                            } else if (this.eventosFilters.startDate) {
+                                const startDate = new Date(this.eventosFilters.startDate);
+                                return eventoDate >= startDate;
+                            } else if (this.eventosFilters.endDate) {
+                                const endDate = new Date(this.eventosFilters.endDate);
+                                return eventoDate <= endDate;
+                            }
+                            
+                            return true;
+                        });
+                    }
+                    
+                    return filtered;
+                },
+                get totalEventosPages() {
+                    return Math.ceil(this.filteredEventosCreditos.length / this.eventosItemsPerPage);
+                },
+                get paginatedEventosCreditos() {
+                    const start = (this.eventosPage - 1) * this.eventosItemsPerPage;
+                    const end = start + this.eventosItemsPerPage;
+                    return this.filteredEventosCreditos.slice(start, end);
+                },
 
                 // --- DATA ---
                 employee: {
@@ -269,6 +323,136 @@
                 auditTabs: [
                     { id: 'historico', name: 'Historico de modificaciones' },
                     { id: 'acciones', name: 'Acciones de usuario' }
+                ],
+                creditosData: [
+                    {
+                        id: 1,
+                        tipo: 'INFONAVIT',
+                        titulo: 'Crédito Hipotecario INFONAVIT',
+                        numeroCredito: 'INF-2024-001234',
+                        acreedor: 'INFONAVIT',
+                        concepto: 'Crédito hipotecario',
+                        montoOriginal: '$450,000.00',
+                        saldoActual: '$385,250.00',
+                        descuentoMensual: '$2,850.00',
+                        fechaInicio: '15/01/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    },
+                    {
+                        id: 2,
+                        tipo: 'FONACOT',
+                        titulo: 'Crédito FONACOT',
+                        numeroCredito: 'FON-2024-567890',
+                        acreedor: 'FONACOT',
+                        concepto: 'Crédito personal',
+                        montoOriginal: '$25,000.00',
+                        saldoActual: '$18,750.00',
+                        descuentoMensual: '$1,250.00',
+                        fechaInicio: '10/03/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    },
+                    {
+                        id: 3,
+                        tipo: 'Pensión',
+                        titulo: 'Pensión Alimenticia',
+                        numeroCredito: 'PENS-2023-001',
+                        acreedor: 'Juzgado Familiar',
+                        concepto: 'Pensión alimenticia',
+                        montoOriginal: null,
+                        saldoActual: null,
+                        descuentoMensual: '$4,500.00',
+                        fechaInicio: '01/06/2023',
+                        status: 'Activo',
+                        beneficiario: 'María Sánchez López',
+                        parentesco: 'Ex-cónyuge',
+                        porcentaje: '30%'
+                    },
+                    {
+                        id: 4,
+                        tipo: 'Terceros',
+                        titulo: 'Préstamo Personal Banco Azteca',
+                        numeroCredito: 'BA-2024-789123',
+                        acreedor: 'Banco Azteca',
+                        concepto: 'Préstamo personal',
+                        montoOriginal: '$15,000.00',
+                        saldoActual: '$8,900.00',
+                        descuentoMensual: '$750.00',
+                        fechaInicio: '20/02/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    },
+                    {
+                        id: 5,
+                        tipo: 'Terceros',
+                        titulo: 'Tarjeta de Crédito Coppel',
+                        numeroCredito: 'COP-2024-456789',
+                        acreedor: 'Coppel',
+                        concepto: 'Tarjeta de crédito',
+                        montoOriginal: '$8,000.00',
+                        saldoActual: '$3,200.00',
+                        descuentoMensual: '$400.00',
+                        fechaInicio: '15/04/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    },
+                    {
+                        id: 6,
+                        tipo: 'Terceros',
+                        titulo: 'Caja de Ahorro',
+                        numeroCredito: 'CA-2024-123456',
+                        acreedor: 'Caja de Ahorro Empresa',
+                        concepto: 'Ahorro empresarial',
+                        montoOriginal: null,
+                        saldoActual: '$12,500.00',
+                        descuentoMensual: '$500.00',
+                        fechaInicio: '01/01/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    },
+                    {
+                        id: 7,
+                        tipo: 'Terceros',
+                        titulo: 'Fondo de Ahorro',
+                        numeroCredito: 'FA-2024-789012',
+                        acreedor: 'Fondo de Ahorro Corporativo',
+                        concepto: 'Ahorro corporativo',
+                        montoOriginal: null,
+                        saldoActual: '$8,750.00',
+                        descuentoMensual: '$350.00',
+                        fechaInicio: '15/02/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    },
+                    {
+                        id: 8,
+                        tipo: 'Terceros',
+                        titulo: 'Lentes Devlyn',
+                        numeroCredito: 'DEV-2024-345678',
+                        acreedor: 'Ópticas Devlyn',
+                        concepto: 'Crédito óptico',
+                        montoOriginal: '$3,500.00',
+                        saldoActual: '$2,100.00',
+                        descuentoMensual: '$175.00',
+                        fechaInicio: '10/05/2024',
+                        status: 'Activo',
+                        beneficiario: null,
+                        parentesco: null,
+                        porcentaje: null
+                    }
                 ],
                 historicoData: [
                     { id: 1, campo: 'Salario Diario', valorAnterior: '$551.25', valorActualizado: '$600.00', usuario: 'Laura Méndez', fecha: '02/08/2025', hora: '10:05:30' },
@@ -416,6 +600,198 @@
                     { id: 9, nombre: 'Ana Prueba X', puesto: 'Especialista', departamento: 'Marketing' },
                     { id: 10, nombre: 'Roberto Jiménez Cruz', puesto: 'Técnico', departamento: 'Soporte' }
                 ],
+                eventosCreditos: [
+                    {
+                        id: 1,
+                        fecha: '2024-01-15',
+                        hora: '10:30:15',
+                        evento: 'Creación de Crédito',
+                        categoria: 'INFONAVIT',
+                        detalle: 'Se registra crédito INF-2024-001234. Tipo: Cuota Fija, Valor: $2,850.00. Monto original: $450,000.00. Origen: Aviso de Retención.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 2,
+                        fecha: '2024-01-31',
+                        hora: '18:00:00',
+                        evento: 'Aplicación de Deducción',
+                        categoria: 'INFONAVIT',
+                        detalle: 'Descuento de $2,850.00 aplicado en nómina Q2-ENE. Saldo anterior: $450,000.00, Saldo nuevo: $447,150.00.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'aplicacion'
+                    },
+                    {
+                        id: 3,
+                        fecha: '2025-02-01',
+                        hora: '11:00:00',
+                        evento: 'Modificación de Crédito',
+                        categoria: 'INFONAVIT',
+                        detalle: 'Cambio de tipo de descuento. Anterior: Cuota Fija, Nuevo: Veces UMI. Valor anterior: $2,850.00, Valor nuevo: 27.1. Origen: Aviso de Modificación.',
+                        usuario: 'rrhh@empresa.com',
+                        tipo: 'modificacion'
+                    },
+                    {
+                        id: 4,
+                        fecha: '2024-03-10',
+                        hora: '14:15:00',
+                        evento: 'Creación de Crédito',
+                        categoria: 'FONACOT',
+                        detalle: 'Se registra crédito FONACOT 12345. Monto total: $24,000.00. Descuento por periodo: $1,000.00.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 5,
+                        fecha: '2023-06-01',
+                        hora: '16:30:00',
+                        evento: 'Creación de Retención',
+                        categoria: 'Pensión',
+                        detalle: 'Se registra retención por Pensión Alimenticia. Expediente: JZF-123/2024. Fórmula: (Ingresos Gravables - ISR - IMSS) * 30%.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 6,
+                        fecha: '2024-02-20',
+                        hora: '12:45:00',
+                        evento: 'Creación de Crédito',
+                        categoria: 'Terceros',
+                        detalle: 'Se registra préstamo personal Banco Azteca con No. BA-2024-789123, Valor: $750.00.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 7,
+                        fecha: '2028-07-15',
+                        hora: '18:00:00',
+                        evento: 'Liquidación de Crédito',
+                        categoria: 'FONACOT',
+                        detalle: 'El saldo ha llegado a cero. El crédito se marca como liquidado y se desactiva.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'liquidacion'
+                    },
+                    {
+                        id: 8,
+                        fecha: '2024-05-15',
+                        hora: '14:30:00',
+                        evento: 'Abono Extraordinario',
+                        categoria: 'INFONAVIT',
+                        detalle: 'Se registra abono extraordinario por $5,000.00. Saldo anterior: $385,250.00, Saldo nuevo: $380,250.00.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'abono'
+                    },
+                    {
+                        id: 9,
+                        fecha: '2024-04-10',
+                        hora: '10:15:00',
+                        evento: 'Aplicación de Deducción',
+                        categoria: 'FONACOT',
+                        detalle: 'Descuento de $1,000.00 aplicado en nómina Q2-ENE. Saldo anterior: $24,000.00, Saldo nuevo: $23,000.00.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'aplicacion'
+                    },
+                    {
+                        id: 10,
+                        fecha: '2024-06-20',
+                        hora: '16:45:00',
+                        evento: 'Modificación de Crédito',
+                        categoria: 'FONACOT',
+                        detalle: 'Se edita el crédito. Campo modificado: Monto Total. Valor anterior: $24,000.00, Valor nuevo: $23,500.00. Motivo: Ajuste administrativo.',
+                        usuario: 'rrhh@empresa.com',
+                        tipo: 'modificacion'
+                    },
+                    {
+                        id: 11,
+                        fecha: '2023-07-15',
+                        hora: '11:30:00',
+                        evento: 'Aplicación de Retención',
+                        categoria: 'Pensión',
+                        detalle: 'Retención de $3,570.80 aplicada en nómina Q2-ENE.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'aplicacion'
+                    },
+                    {
+                        id: 12,
+                        fecha: '2024-01-10',
+                        hora: '09:20:00',
+                        evento: 'Modificación de Retención',
+                        categoria: 'Pensión',
+                        detalle: 'Se edita la fórmula de retención. Fórmula anterior: (...) * 30%, Fórmula nueva: (...) * 35%. Origen: Nueva orden judicial.',
+                        usuario: 'rrhh@empresa.com',
+                        tipo: 'modificacion'
+                    },
+                    {
+                        id: 13,
+                        fecha: '2024-03-25',
+                        hora: '15:10:00',
+                        evento: 'Liquidación de Crédito',
+                        categoria: 'Terceros',
+                        detalle: 'El saldo ha llegado a cero. El crédito se marca como liquidado y se desactiva.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'liquidacion'
+                    },
+                    {
+                        id: 14,
+                        fecha: '2024-01-01',
+                        hora: '08:00:00',
+                        evento: 'Creación de Ahorro',
+                        categoria: 'Terceros',
+                        detalle: 'Se registra Caja de Ahorro CA-2024-123456. Aportación mensual: $500.00. Modalidad: Ahorro empresarial.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 15,
+                        fecha: '2024-02-15',
+                        hora: '09:30:00',
+                        evento: 'Creación de Ahorro',
+                        categoria: 'Terceros',
+                        detalle: 'Se registra Fondo de Ahorro FA-2024-789012. Aportación mensual: $350.00. Modalidad: Ahorro corporativo.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 16,
+                        fecha: '2024-05-10',
+                        hora: '11:15:00',
+                        evento: 'Creación de Crédito',
+                        categoria: 'Terceros',
+                        detalle: 'Se registra crédito Lentes Devlyn DEV-2024-345678. Monto total: $3,500.00. Descuento mensual: $175.00.',
+                        usuario: 'admin@empresa.com',
+                        tipo: 'registro'
+                    },
+                    {
+                        id: 17,
+                        fecha: '2024-01-31',
+                        hora: '18:00:00',
+                        evento: 'Aplicación de Descuento',
+                        categoria: 'Terceros',
+                        detalle: 'Aportación de $500.00 aplicada en nómina Q1-ENE para Caja de Ahorro. Saldo acumulado: $500.00.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'aplicacion'
+                    },
+                    {
+                        id: 18,
+                        fecha: '2024-02-29',
+                        hora: '18:00:00',
+                        evento: 'Aplicación de Descuento',
+                        categoria: 'Terceros',
+                        detalle: 'Aportación de $350.00 aplicada en nómina Q1-FEB para Fondo de Ahorro. Saldo acumulado: $350.00.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'aplicacion'
+                    },
+                    {
+                        id: 19,
+                        fecha: '2024-05-31',
+                        hora: '18:00:00',
+                        evento: 'Aplicación de Deducción',
+                        categoria: 'Terceros',
+                        detalle: 'Descuento de $175.00 aplicado en nómina Q2-MAY para Lentes Devlyn. Saldo anterior: $3,500.00, Saldo nuevo: $3,325.00.',
+                        usuario: 'Sistema (Nómina)',
+                        tipo: 'aplicacion'
+                    }
+                ],
                 
                 // --- METHODS ---
                 toggleAllReceipts(event) {
@@ -503,6 +879,24 @@
             border-bottom: 3px solid transparent;
             color: #475569;
         }
+        /* Custom scrollbar styles */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
 <body class="bg-slate-100">
@@ -571,7 +965,10 @@
                                     <i data-lucide="trending-up" class="w-5 h-5 mr-3"></i> Movimientos IMSS
                                 </a>
                                 <a href="#nomina" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
-                                    <i data-lucide="landmark" class="w-5 h-5 mr-3"></i> Historial de Pagos
+                                    <i data-lucide="landmark" class="w-5 h-5 mr-3"></i> CFDIs Nómina
+                                </a>
+                                <a href="#creditos" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
+                                    <i data-lucide="credit-card" class="w-5 h-5 mr-3"></i> Deducciones y créditos
                                 </a>
                                 <a href="#asistencia" class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg">
                                     <i data-lucide="calendar-check" class="w-5 h-5 mr-3"></i> Asistencia e Incapacidades
@@ -783,387 +1180,596 @@
                                 </div>
                             </div>
 
-                            <!-- Pestaña: Historial de Pagos -->
+                            <!-- Pestaña: CFDIs Nómina -->
                             <div id="nomina" class="content-section">
-                                <div class="bg-white p-6 rounded-lg shadow-sm">
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                
+                                
+                                <!-- Filters and Actions -->
+                                <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                        <div>
+                                            <label for="startDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                            <input type="date" id="startDate" x-model="payrollFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="endDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                            <input type="date" id="endDate" x-model="payrollFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="statusFilter" class="text-xs font-semibold text-slate-600">Estado</label>
+                                            <select id="statusFilter" x-model="payrollFilters.status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                <option value="all">Todos</option>
+                                                <option value="Timbrado">Timbrados</option>
+                                                <option value="Cancelado">Cancelados</option>
+                                            </select>
+                                        </div>
+                                        <button 
+                                            :disabled="selectedReceipts.length === 0" 
+                                            class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center justify-center disabled:bg-slate-300 disabled:cursor-not-allowed">
+                                            <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                            <span x-text="`Descargar ${selectedReceipts.length} timbres`"></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="text-left text-slate-500 bg-slate-50">
+                                            <tr>
+                                                <th class="p-3 w-10 text-center"><input type="checkbox" @change="toggleAllReceipts($event)" class="rounded border-slate-300"></th>
+                                                <th class="p-3 font-semibold">Periodo</th>
+                                                <th class="p-3 font-semibold">Fecha de Pago</th>
+                                                <th class="p-3 font-semibold">Estado</th>
+                                                <th class="p-3 font-semibold text-right">Neto Pagado</th>
+                                                <th class="p-3 font-semibold text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="receipt in filteredPayrollHistory" :key="receipt.id">
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3 text-center">
+                                                        <input type="checkbox" :value="receipt.id" x-model="selectedReceipts" class="rounded border-slate-300">
+                                                    </td>
+                                                    <td class="p-3" x-text="receipt.period"></td>
+                                                    <td class="p-3" x-text="receipt.payDate"></td>
+                                                    <td class="p-3">
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded-full"
+                                                            :class="{
+                                                                'bg-green-100 text-green-800': receipt.status === 'Timbrado',
+                                                                'bg-red-100 text-red-800': receipt.status === 'Cancelado'
+                                                            }"
+                                                            x-text="receipt.status">
+                                                        </span>
+                                                    </td>
+                                                    <td class="p-3 text-right font-mono" x-text="receipt.netAmount"></td>
+                                                    <td class="p-3" x-data="{ open: false }">
+                                                        <div class="relative flex justify-center">
+                                                            <button @click="open = !open" class="p-2 text-slate-500 hover:text-blue-600"><i data-lucide="more-vertical" class="w-5 h-5"></i></button>
+                                                            <div x-show="open" @click.outside="open = false" x-transition class="absolute z-10 right-0 mt-10 w-48 bg-white rounded-md shadow-lg border border-slate-200">
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar PDF</a>
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar XML</a>
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar .ZIP</a>
+                                                                <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Ir a la nómina</a>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Deducciones y créditos -->
+                        <div id="creditos" class="content-section">
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <h2 class="text-lg font-bold text-slate-800 flex items-center mb-6">
+                                    <i data-lucide="credit-card" class="w-6 h-6 mr-3 text-blue-600"></i>
+                                    Deducciones y Créditos
+                                </h2>
+                                
+                                <!-- Tarjetas de Resumen de Créditos Activos -->
+                                <div class="overflow-x-auto custom-scrollbar pb-4 mb-8">
+                                    <div class="flex gap-6 min-w-max">
+                                    <!-- Tarjeta INFONAVIT -->
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 flex-shrink-0 w-80 min-w-[320px]">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <h3 class="font-semibold text-blue-900">Crédito INFONAVIT</h3>
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
+                                        </div>
+                                        <div class="space-y-3 text-sm">
+                                            <div><span class="text-blue-700 font-medium">Número:</span> INF-2024-001234</div>
+                                            <div><span class="text-blue-700 font-medium">Monto Original:</span> $450,000.00</div>
+                                            <div><span class="text-blue-700 font-medium">Saldo Actual:</span> $385,250.00</div>
+                                            <div><span class="text-blue-700 font-medium">Descuento Mensual:</span> <span class="font-bold text-red-600">$2,850.00</span></div>
+                                            <div><span class="text-blue-700 font-medium">Fecha Inicio:</span> 15/01/2024</div>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2 mt-5">
+                                            <button class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-blue-700 transition">Editar</button>
+                                        </div>
+                                    </div>
                                     
+                                    <!-- Tarjeta FONACOT -->
+                                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 flex-shrink-0 w-80 min-w-[320px]">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <h3 class="font-semibold text-green-900">Crédito FONACOT</h3>
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
+                                        </div>
+                                        <div class="space-y-3 text-sm">
+                                            <div><span class="text-green-700 font-medium">Número:</span> FON-2024-567890</div>
+                                            <div><span class="text-green-700 font-medium">Monto Original:</span> $25,000.00</div>
+                                            <div><span class="text-green-700 font-medium">Saldo Actual:</span> $18,750.00</div>
+                                            <div><span class="text-green-700 font-medium">Descuento Mensual:</span> <span class="font-bold text-red-600">$1,250.00</span></div>
+                                            <div><span class="text-green-700 font-medium">Fecha Inicio:</span> 10/03/2024</div>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2 mt-5">
+                                            <button class="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-green-700 transition">Editar</button>
+                                        </div>
+                                    </div>
                                     
-                                    <!-- Filters and Actions -->
-                                    <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                    <!-- Tarjeta Pensión -->
+                                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-6 flex-shrink-0 w-80 min-w-[320px]">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <h3 class="font-semibold text-purple-900">Pensión Alimenticia</h3>
+                                        </div>
+                                        <div class="space-y-3 text-sm">
+                                            <div><span class="text-purple-700 font-medium">Beneficiario:</span> María Sánchez López</div>
+                                            <div><span class="text-purple-700 font-medium">Parentesco:</span> Ex-cónyuge</div>
+                                            <div><span class="text-purple-700 font-medium">Porcentaje:</span> 30%</div>
+                                            <div><span class="text-purple-700 font-medium">Descuento Mensual:</span> <span class="font-bold text-red-600">$4,500.00</span></div>
+                                            <div><span class="text-purple-700 font-medium">Fecha Inicio:</span> 01/06/2023</div>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2 mt-5">
+                                            <button class="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-700 transition">Editar</button>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                                <!-- Filtros de Categoría con Botones -->
+                                <div class="flex flex-wrap gap-2 mb-6">
+                                    <button @click="creditFilter = 'todos'" 
+                                            :class="creditFilter === 'todos' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'"
+                                            class="px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                        Todos
+                                    </button>
+                                    <button @click="creditFilter = 'INFONAVIT'" 
+                                            :class="creditFilter === 'INFONAVIT' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'"
+                                            class="px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                        INFONAVIT
+                                    </button>
+                                    <button @click="creditFilter = 'FONACOT'" 
+                                            :class="creditFilter === 'FONACOT' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'"
+                                            class="px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                        FONACOT
+                                    </button>
+                                    <button @click="creditFilter = 'Pensión'" 
+                                            :class="creditFilter === 'Pensión' ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'"
+                                            class="px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                        Pensión
+                                    </button>
+                                    <button @click="creditFilter = 'Terceros'" 
+                                            :class="creditFilter === 'Terceros' ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'"
+                                            class="px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                        Terceros
+                                    </button>
+                                </div>
+
+                                <!-- Listado de Eventos Históricos -->
+                                <div class="bg-slate-50 rounded-lg p-4">
+                                    <h3 class="font-semibold text-slate-800 mb-4 flex items-center">
+                                        <i data-lucide="history" class="w-5 h-5 mr-2 text-slate-600"></i>
+                                        Historial de Eventos
+                                        <span class="ml-2 px-2 py-1 text-xs bg-slate-200 text-slate-600 rounded-full" x-text="`${filteredEventosCreditos.length} eventos`"></span>
+                                    </h3>
+                                    
+                                    <!-- Filtros de Fecha -->
+                                    <div class="mb-4 p-4 bg-white rounded-lg border border-slate-200">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label for="startDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
-                                                <input type="date" id="startDate" x-model="payrollFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                <label for="eventosStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                                <input type="date" id="eventosStartDate" x-model="eventosFilters.startDate" @change="eventosPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
                                             </div>
                                             <div>
-                                                <label for="endDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
-                                                <input type="date" id="endDate" x-model="payrollFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                <label for="eventosEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                                <input type="date" id="eventosEndDate" x-model="eventosFilters.endDate" @change="eventosPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
                                             </div>
-                                            <div>
-                                                <label for="statusFilter" class="text-xs font-semibold text-slate-600">Estado</label>
-                                                <select id="statusFilter" x-model="payrollFilters.status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    <option value="all">Todos</option>
-                                                    <option value="Timbrado">Timbrados</option>
-                                                    <option value="Cancelado">Cancelados</option>
-                                                </select>
-                                            </div>
-                                            <button 
-                                                :disabled="selectedReceipts.length === 0" 
-                                                class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center justify-center disabled:bg-slate-300 disabled:cursor-not-allowed">
-                                                <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                                <span x-text="`Descargar ${selectedReceipts.length} timbres`"></span>
-                                            </button>
                                         </div>
                                     </div>
 
+                                    <div class="bg-white rounded-lg overflow-hidden border border-slate-200">
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-sm">
+                                                <thead class="text-left text-slate-500 bg-slate-100">
+                                                    <tr>
+                                                        <th class="p-3 font-semibold">Fecha/Hora</th>
+                                                        <th class="p-3 font-semibold">Categoría</th>
+                                                        <th class="p-3 font-semibold">Evento</th>
+                                                        <th class="p-3 font-semibold">Tipo</th>
+                                                        <th class="p-3 font-semibold">Detalle</th>
+                                                        <th class="p-3 font-semibold">Usuario</th>
+                                                        <th class="p-3 font-semibold text-center">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template x-for="evento in paginatedEventosCreditos" :key="evento.id">
+                                                        <tr class="border-t border-slate-200 hover:bg-slate-50 transition-colors">
+                                                            <td class="p-3">
+                                                                <div class="text-slate-900 font-medium" x-text="evento.fecha"></div>
+                                                                <div class="text-slate-500 text-xs" x-text="evento.hora"></div>
+                                                            </td>
+                                                            <td class="p-3">
+                                                                <span class="px-2 py-1 text-xs font-semibold rounded-full"
+                                                                      :class="{
+                                                                          'bg-blue-100 text-blue-800': evento.categoria === 'INFONAVIT',
+                                                                          'bg-green-100 text-green-800': evento.categoria === 'FONACOT',
+                                                                          'bg-purple-100 text-purple-800': evento.categoria === 'Pensión',
+                                                                          'bg-orange-100 text-orange-800': evento.categoria === 'Terceros'
+                                                                      }"
+                                                                      x-text="evento.categoria">
+                                                                </span>
+                                                            </td>
+                                                            <td class="p-3 font-semibold text-slate-800" x-text="evento.evento"></td>
+                                                            <td class="p-3">
+                                                                <span class="px-2 py-1 text-xs rounded-full"
+                                                                      :class="{
+                                                                          'bg-green-100 text-green-800': evento.tipo === 'registro',
+                                                                          'bg-blue-100 text-blue-800': evento.tipo === 'aplicacion',
+                                                                          'bg-yellow-100 text-yellow-800': evento.tipo === 'modificacion',
+                                                                          'bg-gray-100 text-gray-800': evento.tipo === 'liquidacion',
+                                                                          'bg-purple-100 text-purple-800': evento.tipo === 'abono'
+                                                                      }"
+                                                                      x-text="evento.tipo">
+                                                                </span>
+                                                            </td>
+                                                            <td class="p-3 text-slate-600 max-w-md">
+                                                                <div class="truncate" :title="evento.detalle" x-text="evento.detalle"></div>
+                                                            </td>
+                                                            <td class="p-3 text-slate-600 text-sm" x-text="evento.usuario"></td>
+                                                            <td class="p-3 text-center">
+                                                                <template x-if="evento.tipo === 'aplicacion'">
+                                                                    <button class="text-green-600 hover:text-green-800 p-1" title="Ir a nómina">
+                                                                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                                                                    </button>
+                                                                </template>
+                                                            </td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        
+                                        <!-- Paginación -->
+                                        <div class="flex justify-between items-center p-4 border-t border-slate-200">
+                                            <p class="text-sm text-slate-500" x-text="`Mostrando ${paginatedEventosCreditos.length} de ${filteredEventosCreditos.length} eventos`"></p>
+                                            <div class="flex items-center space-x-1">
+                                                <button @click="eventosPage = Math.max(1, eventosPage - 1)" :disabled="eventosPage === 1" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                                                </button>
+                                                <template x-for="page in Array.from({length: totalEventosPages}, (_, i) => i + 1)" :key="page">
+                                                    <button @click="eventosPage = page" 
+                                                            :class="{'bg-blue-600 text-white': eventosPage === page, 'hover:bg-slate-100': eventosPage !== page}" 
+                                                            class="px-3 py-1 rounded-md text-sm font-medium" 
+                                                            x-text="page">
+                                                    </button>
+                                                </template>
+                                                <button @click="eventosPage = Math.min(totalEventosPages, eventosPage + 1)" :disabled="eventosPage === totalEventosPages" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Mensaje cuando no hay eventos -->
+                                        <div x-show="filteredEventosCreditos.length === 0" class="text-center py-12 text-slate-500">
+                                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                                            <p>No hay eventos para mostrar en la categoría seleccionada.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Asistencia e Incapacidades -->
+                        <div id="asistencia" class="content-section">
+                             <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="calendar-check" class="w-6 h-6 mr-3 text-blue-600"></i>Asistencia e Incapacidades</h2>
+                                    <div class="relative" x-data="{ openAbsenceDropdown: false }">
+                                        <button @click="openAbsenceDropdown = !openAbsenceDropdown" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
+                                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                                            Registrar Ausencia
+                                            <i data-lucide="chevron-down" class="w-4 h-4 ml-2"></i>
+                                        </button>
+                                        <div x-show="openAbsenceDropdown" @click.outside="openAbsenceDropdown = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-10">
+                                            <a href="#" @click="openAbsenceDropdown = false; showInasistenciaModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
+                                                <i data-lucide="x-circle" class="w-4 h-4 mr-2 text-red-500"></i>
+                                                Inasistencia
+                                            </a>
+                                            <a href="#" @click="openAbsenceDropdown = false; showIncapacidadModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
+                                                <i data-lucide="heart-pulse" class="w-4 h-4 mr-2 text-orange-500"></i>
+                                                Incapacidad
+                                            </a>
+                                            <a href="#" @click="openAbsenceDropdown = false; showPermisoModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
+                                                <i data-lucide="clock" class="w-4 h-4 mr-2 text-blue-500"></i>
+                                                Permiso
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-8 overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="text-left text-slate-500 bg-slate-50">
+                                            <tr>
+                                                <th class="p-3 font-semibold">Tipo</th>
+                                                <th class="p-3 font-semibold">Fecha inicio</th>
+                                                <th class="p-3 font-semibold">Fecha término</th>
+                                                <th class="p-3 font-semibold">Días</th>
+                                                <th class="p-3 font-semibold">Estado</th>
+                                                <th class="p-3 font-semibold text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="item in attendanceHistory" :key="item.id">
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3 font-semibold" x-text="item.type"></td>
+                                                    <td class="p-3" x-text="item.startDate"></td>
+                                                    <td class="p-3" x-text="item.endDate"></td>
+                                                    <td class="p-3" x-text="item.days"></td>
+                                                    <td class="p-3">
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800" x-text="item.status"></span>
+                                                    </td>
+                                                    <td class="p-3">
+                                                        <div class="flex justify-center space-x-2 text-slate-500">
+                                                            <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Gestión de Vacaciones -->
+                        <div id="vacaciones" class="content-section">
+                            <div class="space-y-6">
+                                <div class="bg-white p-6 rounded-lg shadow-sm">
+                                    <div class="flex justify-between items-center">
+                                        <h2 class="text-lg font-bold text-slate-800">Resumen de Vacaciones</h2>
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="showPoliciesModal = true" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Ver Prestaciones</button>
+                                            <button class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Modificar Prestaciones</button>
+                                        </div>
+                                    </div>
+                                    <!-- New Vacation Balance Layout -->
+                                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                            <p class="text-sm text-blue-800 font-semibold">Total Saldo</p>
+                                            <p class="text-3xl font-bold text-blue-600 mt-1">11.0</p>
+                                            <p class="text-xs text-slate-500">Días disponibles</p>
+                                        </div>
+                                        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+                                            <p class="text-sm text-green-800 font-semibold">Acumuladas</p>
+                                            <p class="text-3xl font-bold text-green-600 mt-1">14.0</p>
+                                            <p class="text-xs text-slate-500">Días ganados por ley</p>
+                                        </div>
+                                        <div class="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                                            <p class="text-sm text-amber-800 font-semibold">Tomadas</p>
+                                            <p class="text-3xl font-bold text-amber-600 mt-1">1.0</p>
+                                            <p class="text-xs text-slate-500">Días ya disfrutados</p>
+                                        </div>
+                                        <div class="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                            <p class="text-sm text-red-800 font-semibold">Vencidas</p>
+                                            <p class="text-3xl font-bold text-red-600 mt-1">2.0</p>
+                                            <p class="text-xs text-slate-500">Periodos expirados</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Vacaciones Tomadas -->
+                                <div class="bg-white p-6 rounded-lg shadow-sm">
+                                    <div class="flex justify-between items-center">
+                                        <h2 class="text-lg font-bold text-slate-800">Historial de Vacaciones Tomadas</h2>
+                                        <button @click="showAddVacationModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
+                                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Agregar
+                                        </button>
+                                    </div>
                                     <div class="mt-4 overflow-x-auto">
                                         <table class="w-full text-sm">
                                             <thead class="text-left text-slate-500 bg-slate-50">
                                                 <tr>
-                                                    <th class="p-3 w-10 text-center"><input type="checkbox" @change="toggleAllReceipts($event)" class="rounded border-slate-300"></th>
-                                                    <th class="p-3 font-semibold">Periodo</th>
-                                                    <th class="p-3 font-semibold">Fecha de Pago</th>
-                                                    <th class="p-3 font-semibold">Estado</th>
-                                                    <th class="p-3 font-semibold text-right">Neto Pagado</th>
-                                                    <th class="p-3 font-semibold text-center">Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <template x-for="receipt in filteredPayrollHistory" :key="receipt.id">
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3 text-center">
-                                                            <input type="checkbox" :value="receipt.id" x-model="selectedReceipts" class="rounded border-slate-300">
-                                                        </td>
-                                                        <td class="p-3" x-text="receipt.period"></td>
-                                                        <td class="p-3" x-text="receipt.payDate"></td>
-                                                        <td class="p-3">
-                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full"
-                                                                :class="{
-                                                                    'bg-green-100 text-green-800': receipt.status === 'Timbrado',
-                                                                    'bg-red-100 text-red-800': receipt.status === 'Cancelado'
-                                                                }"
-                                                                x-text="receipt.status">
-                                                            </span>
-                                                        </td>
-                                                        <td class="p-3 text-right font-mono" x-text="receipt.netAmount"></td>
-                                                        <td class="p-3" x-data="{ open: false }">
-                                                            <div class="relative flex justify-center">
-                                                                <button @click="open = !open" class="p-2 text-slate-500 hover:text-blue-600"><i data-lucide="more-vertical" class="w-5 h-5"></i></button>
-                                                                <div x-show="open" @click.outside="open = false" x-transition class="absolute z-10 right-0 mt-10 w-48 bg-white rounded-md shadow-lg border border-slate-200">
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar PDF</a>
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar XML</a>
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Descargar .ZIP</a>
-                                                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Ir a la nómina</a>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </template>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Asistencia e Incapacidades -->
-                            <div id="asistencia" class="content-section">
-                                 <div class="bg-white p-6 rounded-lg shadow-sm">
-                                    <div class="flex justify-between items-center">
-                                        <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="calendar-check" class="w-6 h-6 mr-3 text-blue-600"></i>Asistencia e Incapacidades</h2>
-                                        <div class="relative" x-data="{ openAbsenceDropdown: false }">
-                                            <button @click="openAbsenceDropdown = !openAbsenceDropdown" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                                <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
-                                                Registrar Ausencia
-                                                <i data-lucide="chevron-down" class="w-4 h-4 ml-2"></i>
-                                            </button>
-                                            <div x-show="openAbsenceDropdown" @click.outside="openAbsenceDropdown = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-10">
-                                                <a href="#" @click="openAbsenceDropdown = false; showInasistenciaModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
-                                                    <i data-lucide="x-circle" class="w-4 h-4 mr-2 text-red-500"></i>
-                                                    Inasistencia
-                                                </a>
-                                                <a href="#" @click="openAbsenceDropdown = false; showIncapacidadModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
-                                                    <i data-lucide="heart-pulse" class="w-4 h-4 mr-2 text-orange-500"></i>
-                                                    Incapacidad
-                                                </a>
-                                                <a href="#" @click="openAbsenceDropdown = false; showPermisoModal = true" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center">
-                                                    <i data-lucide="clock" class="w-4 h-4 mr-2 text-blue-500"></i>
-                                                    Permiso
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-8 overflow-x-auto">
-                                        <table class="w-full text-sm">
-                                            <thead class="text-left text-slate-500 bg-slate-50">
-                                                <tr>
+                                                    <th class="p-3 font-semibold">Inicio</th>
+                                                    <th class="p-3 font-semibold">Término</th>
+                                                    <th class="p-3 font-semibold">Número de Días</th>
                                                     <th class="p-3 font-semibold">Tipo</th>
-                                                    <th class="p-3 font-semibold">Fecha inicio</th>
-                                                    <th class="p-3 font-semibold">Fecha término</th>
-                                                    <th class="p-3 font-semibold">Días</th>
                                                     <th class="p-3 font-semibold">Estado</th>
-                                                    <th class="p-3 font-semibold text-center">Acciones</th>
+                                                    <th class="p-3 font-semibold">Opciones</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <template x-for="item in attendanceHistory" :key="item.id">
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3 font-semibold" x-text="item.type"></td>
-                                                        <td class="p-3" x-text="item.startDate"></td>
-                                                        <td class="p-3" x-text="item.endDate"></td>
-                                                        <td class="p-3" x-text="item.days"></td>
-                                                        <td class="p-3">
-                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800" x-text="item.status"></span>
-                                                        </td>
-                                                        <td class="p-3">
-                                                            <div class="flex justify-center space-x-2 text-slate-500">
-                                                                <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </template>
+                                                <tr class="border-t border-slate-200">
+                                                    <td class="p-3">11-09-2025</td>
+                                                    <td class="p-3">11-09-2025</td>
+                                                    <td class="p-3">1.0</td>
+                                                    <td class="p-3">Legales</td>
+                                                    <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Aprobada</span></td>
+                                                    <td class="p-3">
+                                                        <div class="flex space-x-2 text-slate-500">
+                                                            <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
+                                                            <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Pestaña: Gestión de Vacaciones -->
-                            <div id="vacaciones" class="content-section">
-                                <div class="space-y-6">
+                         <!-- Pestaña: Expediente Digital -->
+                        <div id="documentos" class="content-section">
+                             <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="folder-archive" class="w-6 h-6 mr-3 text-blue-600"></i>Expediente Digital</h2>
+                                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
+                                        <i data-lucide="upload" class="w-4 h-4 mr-2"></i>Subir archivo
+                                    </button>
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <template x-for="doc in digitalFile">
+                                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <i data-lucide="file-text" class="w-5 h-5 mr-3 text-slate-500"></i>
+                                                <span class="text-sm font-semibold" x-text="doc.name"></span>
+                                            </div>
+                                            <button class="p-1 text-slate-400 hover:text-blue-600"><i data-lucide="download" class="w-5 h-5"></i></button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña: Auditoría -->
+                        <div id="auditoria" class="content-section">
+                            <!-- Sub-navegación de pestañas para Auditoría -->
+                            <nav class="border-b border-slate-200 mb-6">
+                                <div class="flex space-x-8">
+                                    <template x-for="tab in auditTabs" :key="tab.id">
+                                        <button @click="activeAuditTab = tab.id" 
+                                                :class="activeAuditTab === tab.id ? 'profile-tab-active' : 'profile-tab-inactive'" 
+                                                class="py-3 px-1 text-sm transition-colors duration-200" 
+                                                x-text="tab.name">
+                                        </button>
+                                    </template>
+                                </div>
+                            </nav>
+
+                            <!-- Contenido de las sub-pestañas -->
+                            <div>
+                                <!-- Histórico -->
+                                <div x-show="activeAuditTab === 'historico'">
                                     <div class="bg-white p-6 rounded-lg shadow-sm">
-                                        <div class="flex justify-between items-center">
-                                            <h2 class="text-lg font-bold text-slate-800">Resumen de Vacaciones</h2>
-                                            <div class="flex items-center space-x-2">
-                                                <button @click="showPoliciesModal = true" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Ver Prestaciones</button>
-                                                <button class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Modificar Prestaciones</button>
+                                        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                            <i data-lucide="history" class="w-5 h-5 mr-3 text-blue-600"></i>
+                                            Histórico de Modificaciones
+                                        </h3>
+                                        <!-- Filtros -->
+                                        <div class="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label for="historicoStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                                    <input type="date" id="historicoStartDate" x-model="historicoFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                </div>
+                                                <div>
+                                                    <label for="historicoEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                                    <input type="date" id="historicoEndDate" x-model="historicoFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                </div>
+                                                <div>
+                                                    <label for="historicoUsuario" class="text-xs font-semibold text-slate-600">Usuario</label>
+                                                    <select id="historicoUsuario" x-model="historicoFilters.usuario" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                        <option value="all">Todos los usuarios</option>
+                                                        <option value="Eduardo Castillo">Eduardo Castillo</option>
+                                                        <option value="Laura Méndez">Laura Méndez</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
-                                        <!-- New Vacation Balance Layout -->
-                                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                            <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                                                <p class="text-sm text-blue-800 font-semibold">Total Saldo</p>
-                                                <p class="text-3xl font-bold text-blue-600 mt-1">11.0</p>
-                                                <p class="text-xs text-slate-500">Días disponibles</p>
-                                            </div>
-                                            <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
-                                                <p class="text-sm text-green-800 font-semibold">Acumuladas</p>
-                                                <p class="text-3xl font-bold text-green-600 mt-1">14.0</p>
-                                                <p class="text-xs text-slate-500">Días ganados por ley</p>
-                                            </div>
-                                            <div class="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                                                <p class="text-sm text-amber-800 font-semibold">Tomadas</p>
-                                                <p class="text-3xl font-bold text-amber-600 mt-1">1.0</p>
-                                                <p class="text-xs text-slate-500">Días ya disfrutados</p>
-                                            </div>
-                                            <div class="bg-red-50 border border-red-200 p-4 rounded-lg">
-                                                <p class="text-sm text-red-800 font-semibold">Vencidas</p>
-                                                <p class="text-3xl font-bold text-red-600 mt-1">2.0</p>
-                                                <p class="text-xs text-slate-500">Periodos expirados</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Vacaciones Tomadas -->
-                                    <div class="bg-white p-6 rounded-lg shadow-sm">
-                                        <div class="flex justify-between items-center">
-                                            <h2 class="text-lg font-bold text-slate-800">Historial de Vacaciones Tomadas</h2>
-                                            <button @click="showAddVacationModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                                <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Agregar
-                                            </button>
-                                        </div>
-                                        <div class="mt-4 overflow-x-auto">
+                                        
+                                        <div class="overflow-x-auto">
                                             <table class="w-full text-sm">
                                                 <thead class="text-left text-slate-500 bg-slate-50">
                                                     <tr>
-                                                        <th class="p-3 font-semibold">Inicio</th>
-                                                        <th class="p-3 font-semibold">Término</th>
-                                                        <th class="p-3 font-semibold">Número de Días</th>
-                                                        <th class="p-3 font-semibold">Tipo</th>
-                                                        <th class="p-3 font-semibold">Estado</th>
-                                                        <th class="p-3 font-semibold">Opciones</th>
+                                                        <th class="p-3 font-semibold">Campo modificado</th>
+                                                        <th class="p-3 font-semibold">Valor actualizado</th>
+                                                        <th class="p-3 font-semibold">Valor anterior</th>
+                                                        <th class="p-3 font-semibold">Usuario</th>
+                                                        <th class="p-3 font-semibold">Fecha</th>
+                                                        <th class="p-3 font-semibold">Hora</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr class="border-t border-slate-200">
-                                                        <td class="p-3">11-09-2025</td>
-                                                        <td class="p-3">11-09-2025</td>
-                                                        <td class="p-3">1.0</td>
-                                                        <td class="p-3">Legales</td>
-                                                        <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Aprobada</span></td>
-                                                        <td class="p-3">
-                                                            <div class="flex space-x-2 text-slate-500">
-                                                                <button class="hover:text-blue-600"><i data-lucide="eye" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-blue-600"><i data-lucide="pencil" class="w-5 h-5"></i></button>
-                                                                <button class="hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                    <template x-for="item in filteredHistoricoData" :key="item.id">
+                                                        <tr class="border-t border-slate-200">
+                                                            <td class="p-3 font-semibold" x-text="item.campo"></td>
+                                                            <td class="p-3 text-green-600 font-medium" x-text="item.valorActualizado"></td>
+                                                            <td class="p-3 text-slate-500" x-text="item.valorAnterior"></td>
+                                                            <td class="p-3" x-text="item.usuario"></td>
+                                                            <td class="p-3" x-text="item.fecha"></td>
+                                                            <td class="p-3" x-text="item.hora"></td>
+                                                        </tr>
+                                                    </template>
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                             <!-- Pestaña: Expediente Digital -->
-                            <div id="documentos" class="content-section">
-                                 <div class="bg-white p-6 rounded-lg shadow-sm">
-                                    <div class="flex justify-between items-center">
-                                        <h2 class="text-lg font-bold text-slate-800 flex items-center"><i data-lucide="folder-archive" class="w-6 h-6 mr-3 text-blue-600"></i>Expediente Digital</h2>
-                                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center">
-                                            <i data-lucide="upload" class="w-4 h-4 mr-2"></i>Subir archivo
-                                        </button>
-                                    </div>
-                                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        <template x-for="doc in digitalFile">
-                                            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">
-                                                <div class="flex items-center">
-                                                    <i data-lucide="file-text" class="w-5 h-5 mr-3 text-slate-500"></i>
-                                                    <span class="text-sm font-semibold" x-text="doc.name"></span>
+                                <!-- Acciones de usuario -->
+                                <div x-show="activeAuditTab === 'acciones'">
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                            <i data-lucide="shield-check" class="w-5 h-5 mr-3 text-blue-600"></i>
+                                            Registro de Acciones de Usuario
+                                        </h3>
+                                        
+                                        <!-- Filtros -->
+                                        <div class="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label for="auditStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
+                                                    <input type="date" id="auditStartDate" x-model="auditFilters.startDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
                                                 </div>
-                                                <button class="p-1 text-slate-400 hover:text-blue-600"><i data-lucide="download" class="w-5 h-5"></i></button>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña: Auditoría -->
-                            <div id="auditoria" class="content-section">
-                                <!-- Sub-navegación de pestañas para Auditoría -->
-                                <nav class="border-b border-slate-200 mb-6">
-                                    <div class="flex space-x-8">
-                                        <template x-for="tab in auditTabs" :key="tab.id">
-                                            <button @click="activeAuditTab = tab.id" 
-                                                    :class="activeAuditTab === tab.id ? 'profile-tab-active' : 'profile-tab-inactive'" 
-                                                    class="py-3 px-1 text-sm transition-colors duration-200" 
-                                                    x-text="tab.name">
-                                            </button>
-                                        </template>
-                                    </div>
-                                </nav>
-
-                                <!-- Contenido de las sub-pestañas -->
-                                <div>
-                                    <!-- Histórico -->
-                                    <div x-show="activeAuditTab === 'historico'">
-                                        <div class="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                                <i data-lucide="history" class="w-5 h-5 mr-3 text-blue-600"></i>
-                                                Histórico de Modificaciones
-                                            </h3>
-                                            <!-- Filtros -->
-                                            <div class="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <div>
-                                                        <label for="historicoStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
-                                                        <input type="date" id="historicoStartDate" x-model="historicoFilters.startDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    </div>
-                                                    <div>
-                                                        <label for="historicoEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
-                                                        <input type="date" id="historicoEndDate" x-model="historicoFilters.endDate" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    </div>
-                                                    <div>
-                                                        <label for="historicoUsuario" class="text-xs font-semibold text-slate-600">Usuario</label>
-                                                        <select id="historicoUsuario" x-model="historicoFilters.usuario" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                            <option value="all">Todos los usuarios</option>
-                                                            <option value="Eduardo Castillo">Eduardo Castillo</option>
-                                                            <option value="Laura Méndez">Laura Méndez</option>
-                                                        </select>
-                                                    </div>
+                                                <div>
+                                                    <label for="auditEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
+                                                    <input type="date" id="auditEndDate" x-model="auditFilters.endDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
                                                 </div>
-                                            </div>
-                                            
-                                            <div class="overflow-x-auto">
-                                                <table class="w-full text-sm">
-                                                    <thead class="text-left text-slate-500 bg-slate-50">
-                                                        <tr>
-                                                            <th class="p-3 font-semibold">Campo modificado</th>
-                                                            <th class="p-3 font-semibold">Valor actualizado</th>
-                                                            <th class="p-3 font-semibold">Valor anterior</th>
-                                                            <th class="p-3 font-semibold">Usuario</th>
-                                                            <th class="p-3 font-semibold">Fecha</th>
-                                                            <th class="p-3 font-semibold">Hora</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <template x-for="item in filteredHistoricoData" :key="item.id">
-                                                            <tr class="border-t border-slate-200">
-                                                                <td class="p-3 font-semibold" x-text="item.campo"></td>
-                                                                <td class="p-3 text-green-600 font-medium" x-text="item.valorActualizado"></td>
-                                                                <td class="p-3 text-slate-500" x-text="item.valorAnterior"></td>
-                                                                <td class="p-3" x-text="item.usuario"></td>
-                                                                <td class="p-3" x-text="item.fecha"></td>
-                                                                <td class="p-3" x-text="item.hora"></td>
-                                                            </tr>
-                                                        </template>
-                                                    </tbody>
-                                                </table>
+                                                <div>
+                                                    <label for="auditDescription" class="text-xs font-semibold text-slate-600">Búsqueda por descripción</label>
+                                                    <input type="text" id="auditDescription" x-model="auditFilters.description" @input="auditLogPage = 1" placeholder="Buscar en descripción..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Acciones de usuario -->
-                                    <div x-show="activeAuditTab === 'acciones'">
-                                        <div class="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                                <i data-lucide="shield-check" class="w-5 h-5 mr-3 text-blue-600"></i>
-                                                Registro de Acciones de Usuario
-                                            </h3>
-                                            
-                                            <!-- Filtros -->
-                                            <div class="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <div>
-                                                        <label for="auditStartDate" class="text-xs font-semibold text-slate-600">Fecha de inicio</label>
-                                                        <input type="date" id="auditStartDate" x-model="auditFilters.startDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    </div>
-                                                    <div>
-                                                        <label for="auditEndDate" class="text-xs font-semibold text-slate-600">Fecha de fin</label>
-                                                        <input type="date" id="auditEndDate" x-model="auditFilters.endDate" @change="auditLogPage = 1" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    </div>
-                                                    <div>
-                                                        <label for="auditDescription" class="text-xs font-semibold text-slate-600">Búsqueda por descripción</label>
-                                                        <input type="text" id="auditDescription" x-model="auditFilters.description" @input="auditLogPage = 1" placeholder="Buscar en descripción..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="overflow-x-auto">
-                                                <table class="w-full text-sm">
-                                                    <thead class="text-left text-slate-500 bg-slate-50">
-                                                        <tr>
-                                                            <th class="p-3 font-semibold">Descripción</th>
-                                                            <th class="p-3 font-semibold">Nombre usuario</th>
-                                                            <th class="p-3 font-semibold">Rol de usuario</th>
-                                                            <th class="p-3 font-semibold">Fecha</th>
-                                                            <th class="p-3 font-semibold">Hora</th>
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-sm">
+                                                <thead class="text-left text-slate-500 bg-slate-50">
+                                                    <tr>
+                                                        <th class="p-3 font-semibold">Descripción</th>
+                                                        <th class="p-3 font-semibold">Nombre usuario</th>
+                                                        <th class="p-3 font-semibold">Rol de usuario</th>
+                                                        <th class="p-3 font-semibold">Fecha</th>
+                                                        <th class="p-3 font-semibold">Hora</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template x-for="log in paginatedAuditLog" :key="log.id">
+                                                        <tr class="border-t border-slate-200">
+                                                            <td class="p-3" x-text="log.description"></td>
+                                                            <td class="p-3" x-text="log.user"></td>
+                                                            <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700" x-text="log.role"></span></td>
+                                                            <td class="p-3" x-text="log.date"></td>
+                                                            <td class="p-3" x-text="log.time"></td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <template x-for="log in paginatedAuditLog" :key="log.id">
-                                                            <tr class="border-t border-slate-200">
-                                                                <td class="p-3" x-text="log.description"></td>
-                                                                <td class="p-3" x-text="log.user"></td>
-                                                                <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700" x-text="log.role"></span></td>
-                                                                <td class="p-3" x-text="log.date"></td>
-                                                                <td class="p-3" x-text="log.time"></td>
-                                                            </tr>
-                                                        </template>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <!-- Pagination -->
-                                            <div class="mt-4 flex justify-between items-center text-sm">
-                                                <p class="text-slate-500" x-text="`Mostrando ${paginatedAuditLog.length} de ${filteredAuditLog.length} registros`"></p>
-                                                <div class="flex items-center space-x-1">
-                                                    <button @click="auditLogPage = Math.max(1, auditLogPage - 1)" :disabled="auditLogPage === 1" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                                                    <template x-for="page in totalAuditPages">
-                                                        <button @click="auditLogPage = page" :class="{'bg-blue-600 text-white': auditLogPage === page, 'hover:bg-slate-100': auditLogPage !== page}" class="px-3 py-1 rounded-md" x-text="page"></button>
                                                     </template>
-                                                    <button @click="auditLogPage = Math.min(totalAuditPages, auditLogPage + 1)" :disabled="auditLogPage === totalAuditPages" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
-                                                </div>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <!-- Pagination -->
+                                        <div class="mt-4 flex justify-between items-center text-sm">
+                                            <p class="text-slate-500" x-text="`Mostrando ${paginatedAuditLog.length} de ${filteredAuditLog.length} registros`"></p>
+                                            <div class="flex items-center space-x-1">
+                                                <button @click="auditLogPage = Math.max(1, auditLogPage - 1)" :disabled="auditLogPage === 1" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                                                <template x-for="page in totalAuditPages">
+                                                    <button @click="auditLogPage = page" :class="{'bg-blue-600 text-white': auditLogPage === page, 'hover:bg-slate-100': auditLogPage !== page}" class="px-3 py-1 rounded-md" x-text="page"></button>
+                                                </template>
+                                                <button @click="auditLogPage = Math.min(totalAuditPages, auditLogPage + 1)" :disabled="auditLogPage === totalAuditPages" class="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
                                             </div>
                                         </div>
                                     </div>
